@@ -1,9 +1,7 @@
-import { Button } from "@/components/ui/button";
-
 export default function Home() {
   return (
-    <main className="h-screen flex items-center justify-center">
-      <Button variant="default">Hi Maria!</Button>
+    <main className="min-h-screen flex items-center justify-center">
+      <h1 className="text-4xl font-bold">Welcome to Cramspresso!</h1>
     </main>
-  )
+  );
 }
