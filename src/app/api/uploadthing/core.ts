@@ -1,4 +1,4 @@
-import { createUploadthing } from "uploadthing/next";
+import { createUploadthing, FileRouter } from "uploadthing/next";
 
 const f = createUploadthing({
   errorFormatter: (err) => {
@@ -12,6 +12,6 @@ export const uploadRouter = {
   pdfAndTxt: f(["pdf", "text"]).onUploadComplete(({ file }) => {
     console.log("File uploaded successfully:", file.ufsUrl);
   }),
-};
+} satisfies FileRouter;
 
 export type OurFileRouter = typeof uploadRouter;
