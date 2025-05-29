@@ -11,17 +11,30 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
+  sets      FlashcardSet[]
   createdAt DateTime @default(now())
-  flashcards Flashcard[]
+}
+
+model FlashcardSet {
+  id         String   @id @default(cuid())
+  name       String
+  cards      Flashcard[]
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([name, userId])
 }
 
 model Flashcard {
   id         String   @id @default(cuid())
   question   String
   answer     String
+  set        FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  setId      String
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
+  updatedAt  DateTime @updatedAt
 
-  @@unique([question, answer, userId])
+  @@unique([question, setId])
 }
