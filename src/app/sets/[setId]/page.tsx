@@ -39,7 +39,10 @@ export default function SetEditor() {
       return;
     }
     await appendCardsToSet(setId, newCards);
-    setCards((prev) => [...newCards, ...prev]);
+
+    const res = await fetch(`/api/sets/${setId}`);
+    if (!res.ok) throw new Error("Failed to refresh set");
+    setCards(await res.json().then((data) => data.cards));
   }
 
   return (
