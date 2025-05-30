@@ -6,7 +6,8 @@ import { UploadZone } from "@/components/UploadZone";
 import {
   appendCardsToSet,
   generateFromUrls,
-  updateCard,
+  updateCardInSet,
+  deleteCardFromSet,
 } from "@/lib/flashcardApi";
 import { Flashcard } from "@/lib/flashcards";
 import { Button } from "@/components/ui/button";
@@ -66,8 +67,9 @@ export default function SetEditor() {
     setEditingAnswer(card.answer);
   }
 
-  async function saveEditedCard(cardId: string) {
-    await updateCard(setId, cardId, {
+  async function saveEditedCard() {
+    if (!editingCardId) return;
+    await updateCardInSet(setId, editingCardId, {
       question: editingQuestion,
       answer: editingAnswer,
     });
@@ -79,6 +81,19 @@ export default function SetEditor() {
     setEditingCardId(null);
     setEditingQuestion("");
     setEditingAnswer("");
+  }
+
+  async function deleteCard() {
+    if (!editingCardId) return;
+
+    const confirm = window.confirm(
+      "Are you sure you want to delete this card? This action cannot be undone."
+    );
+    if (!confirm) return;
+
+    await deleteCardFromSet(setId, editingCardId);
+    setEditingCardId(null);
+    await loadSet();
   }
 
   async function onUpload(files: { ufsUrl: string }[]) {
@@ -150,13 +165,7 @@ export default function SetEditor() {
                       <div className="space-x-2">
                         <Button
                           className="bg-green-500 text-white px-3 py-1 rounded"
-                          onClick={() => {
-                            if (card.id) {
-                              saveEditedCard(card.id);
-                            } else {
-                              alert("Unsaved cards cannot be edited.");
-                            }
-                          }}
+                          onClick={() => saveEditedCard()}
                         >
                           Save
                         </Button>
@@ -165,6 +174,12 @@ export default function SetEditor() {
                           onClick={cancelEdit}
                         >
                           Cancel
+                        </Button>
+                        <Button
+                          className="bg-red-500 text-white px-3 py-1 rounded"
+                          onClick={deleteCard}
+                        >
+                          Delete
                         </Button>
                       </div>
                     </>

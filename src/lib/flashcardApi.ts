@@ -35,9 +35,8 @@ export async function createSetWithCards(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, cards }),
   });
-  const payload = await res.json();
-  if (!res.ok) throw new Error(payload.error ?? "Failed to create set");
-  return { setId: payload.id };
+  if (!res.ok) throw new Error("Failed to create set");
+  return { setId: (await res.json()).id };
 }
 
 export async function appendCardsToSet(
@@ -49,10 +48,10 @@ export async function appendCardsToSet(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cards }),
   });
-  if (!res.ok) throw new Error("Failed to append cards to set");
+  if (!res.ok) throw new Error("Failed to append cards");
 }
 
-export async function updateCard(
+export async function updateCardInSet(
   setId: string,
   cardId: string,
   updates: { question: string; answer: string }
@@ -62,8 +61,34 @@ export async function updateCard(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) {
-    const payload = await res.json();
-    throw new Error(payload.error ?? "Failed to update card");
-  }
+  if (!res.ok) throw new Error("Failed to update card");
+}
+
+export async function deleteCardFromSet(
+  setId: string,
+  cardId: string
+): Promise<void> {
+  const res = await fetch(`/api/sets/${setId}/cards/${cardId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete card");
+}
+
+export async function updateSetName(
+  setId: string,
+  name: string
+): Promise<void> {
+  const res = await fetch(`/api/sets/${setId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("Failed to update set name");
+}
+
+export async function deleteSet(setId: string): Promise<void> {
+  const res = await fetch(`/api/sets/${setId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete set");
 }
