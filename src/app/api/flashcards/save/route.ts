@@ -17,8 +17,7 @@ export async function POST(req: NextRequest) {
   const { cards } = await req.json();
   const result = await prisma.flashcard.createMany({
     data: cards.map((card: { question: string; answer: string }) => ({
-      question: card.question,
-      answer: card.answer,
+      ...card,
       userId: dbUser.id,
     })),
     skipDuplicates: true,
