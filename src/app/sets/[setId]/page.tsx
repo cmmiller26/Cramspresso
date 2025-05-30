@@ -1,20 +1,28 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { UploadZone } from "@/components/UploadZone";
 import {
   appendCardsToSet,
   generateFromUrls,
   updateCardInSet,
   deleteCardFromSet,
+  updateSetName,
+  deleteSet,
 } from "@/lib/flashcardApi";
 import { Flashcard } from "@/lib/flashcards";
-import { Button } from "@/components/ui/button";
 
 export default function SetEditor() {
   const { setId } = useParams() as { setId: string };
+
+  const [setName, setSetName] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+
   const [cards, setCards] = useState<Flashcard[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,14 +33,18 @@ export default function SetEditor() {
   const [editingQuestion, setEditingQuestion] = useState("");
   const [editingAnswer, setEditingAnswer] = useState("");
 
+  const router = useRouter();
+
   const loadSet = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/sets/${setId}`);
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "Failed to load set");
-      setCards(payload.cards);
+      if (!res.ok) throw new Error("Failed to load set");
+
+      const data = await res.json();
+      setSetName(data.name);
+      setCards(data.cards);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -55,6 +67,22 @@ export default function SetEditor() {
     setNewQuestion("");
     setNewAnswer("");
     await loadSet();
+  }
+
+  async function saveSetName() {
+    if (!setName.trim()) return;
+    await updateSetName(setId, setName.trim());
+    setIsEditingName(false);
+  }
+
+  async function handleDeleteSet() {
+    const confirm = window.confirm(
+      "Are you sure you want to delete this set? This action cannot be undone."
+    );
+    if (!confirm) return;
+
+    await deleteSet(setId);
+    router.push("/dashboard");
   }
 
   function startEditingCard(card: Flashcard) {
@@ -118,6 +146,38 @@ export default function SetEditor() {
         <p className="text-red-500">Error: {error}</p>
       ) : (
         <>
+          <section className="flex items-center justify-between space-x-4">
+            {isEditingName ? (
+              <>
+                <input
+                  className="border p-2 flex-grow"
+                  value={setName}
+                  onChange={(e) => setSetName(e.target.value)}
+                />
+                <Button onClick={saveSetName}>Save</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsEditingName(false)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold flex-grow">{setName}</h1>
+                <Button onClick={() => setIsEditingName(true)}>
+                  Edit Name
+                </Button>
+                <Button
+                  className="bg-red-500 text-white"
+                  onClick={handleDeleteSet}
+                >
+                  Delete Set
+                </Button>
+              </>
+            )}
+          </section>
+
           <UploadZone onClientUploadComplete={onUpload} />
 
           <section className="space-y-2">
