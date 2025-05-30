@@ -51,3 +51,19 @@ export async function appendCardsToSet(
   });
   if (!res.ok) throw new Error("Failed to append cards to set");
 }
+
+export async function updateCard(
+  setId: string,
+  cardId: string,
+  updates: { question: string; answer: string }
+): Promise<void> {
+  const res = await fetch(`/api/sets/${setId}/cards/${cardId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const payload = await res.json();
+    throw new Error(payload.error ?? "Failed to update card");
+  }
+}

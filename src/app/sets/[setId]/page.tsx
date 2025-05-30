@@ -1,10 +1,15 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UploadZone } from "@/components/UploadZone";
-import { appendCardsToSet, generateFromUrls } from "@/lib/flashcardApi";
+import {
+  appendCardsToSet,
+  generateFromUrls,
+  updateCard,
+} from "@/lib/flashcardApi";
 import { Flashcard } from "@/lib/flashcards";
+import { Button } from "@/components/ui/button";
 
 export default function SetEditor() {
   const { setId } = useParams() as { setId: string };
@@ -12,24 +17,69 @@ export default function SetEditor() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadSet() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/sets/${setId}`);
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error ?? "Failed to load set");
-        setCards(payload.cards);
-      } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
-      }
+  const [newQuestion, setNewQuestion] = useState("");
+  const [newAnswer, setNewAnswer] = useState("");
+
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState("");
+  const [editingAnswer, setEditingAnswer] = useState("");
+
+  const loadSet = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/sets/${setId}`);
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Failed to load set");
+      setCards(payload.cards);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
     }
-    loadSet();
   }, [setId]);
+
+  useEffect(() => {
+    loadSet();
+  }, [loadSet]);
+
+  async function addNewCard() {
+    if (!newQuestion.trim() || !newAnswer.trim()) return;
+    const newCard: Flashcard = {
+      question: newQuestion.trim(),
+      answer: newAnswer.trim(),
+    };
+    await appendCardsToSet(setId, [newCard]);
+    setNewQuestion("");
+    setNewAnswer("");
+    await loadSet();
+  }
+
+  function startEditingCard(card: Flashcard) {
+    if (!card.id) {
+      alert("Unsaved cards cannot be edited.");
+      return;
+    }
+    setEditingCardId(card.id);
+    setEditingQuestion(card.question);
+    setEditingAnswer(card.answer);
+  }
+
+  async function saveEditedCard(cardId: string) {
+    await updateCard(setId, cardId, {
+      question: editingQuestion,
+      answer: editingAnswer,
+    });
+    setEditingCardId(null);
+    await loadSet();
+  }
+
+  function cancelEdit() {
+    setEditingCardId(null);
+    setEditingQuestion("");
+    setEditingAnswer("");
+  }
 
   async function onUpload(files: { ufsUrl: string }[]) {
     const urls = files.map((f) => f.ufsUrl);
@@ -55,13 +105,87 @@ export default function SetEditor() {
         <>
           <UploadZone onClientUploadComplete={onUpload} />
 
+          <section className="space-y-2">
+            <h2 className="text-xl font-semibold">Create New Card</h2>
+            <input
+              className="border p-2 w-full"
+              placeholder="Question"
+              value={newQuestion}
+              onChange={(e) => setNewQuestion(e.target.value)}
+            />
+            <input
+              className="border p-2 w-full"
+              placeholder="Answer"
+              value={newAnswer}
+              onChange={(e) => setNewAnswer(e.target.value)}
+            />
+            <Button
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+              onClick={addNewCard}
+            >
+              Add Card
+            </Button>
+          </section>
+
           <section>
             <h2 className="text-xl font-semibold">Cards</h2>
             <ul className="space-y-4">
-              {cards.map((c, i) => (
-                <li key={i} className="border p-3 rounded">
-                  <p className="font-semibold">{c.question}</p>
-                  <p>{c.answer}</p>
+              {cards.map((card, index) => (
+                <li
+                  key={card.id ?? `unsaved-${index}`}
+                  className="border p-3 rounded space-y-2"
+                >
+                  {editingCardId === card.id ? (
+                    <>
+                      <input
+                        className="border p-2 w-full"
+                        value={editingQuestion}
+                        onChange={(e) => setEditingQuestion(e.target.value)}
+                      />
+                      <input
+                        className="border p-2 w-full"
+                        value={editingAnswer}
+                        onChange={(e) => setEditingAnswer(e.target.value)}
+                      />
+                      <div className="space-x-2">
+                        <Button
+                          className="bg-green-500 text-white px-3 py-1 rounded"
+                          onClick={() => {
+                            if (card.id) {
+                              saveEditedCard(card.id);
+                            } else {
+                              alert("Unsaved cards cannot be edited.");
+                            }
+                          }}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          className="bg-gray-300 px-3 py-1 rounded"
+                          onClick={cancelEdit}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold">{card.question}</p>
+                      <p>{card.answer}</p>
+                      {card.id ? (
+                        <Button
+                          className="text-sm text-blue-600"
+                          onClick={() => startEditingCard(card)}
+                        >
+                          Edit
+                        </Button>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">
+                          Unsaved card
+                        </p>
+                      )}
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
