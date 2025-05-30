@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
-  const { userId: clerkId } = getAuth(req);
+export async function GET() {
+  const { userId: clerkId } = await auth();
   if (!clerkId)
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   const user = await prisma.user.findUnique({ where: { clerkId } });
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = getAuth(req);
+  const { userId: clerkId } = await auth();
   if (!clerkId)
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
