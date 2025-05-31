@@ -21,6 +21,8 @@ async function generateCards(text: string): Promise<Flashcard[]> {
 }
 
 export async function generateFromUrls(urls: string[]): Promise<Flashcard[]> {
+  if (!Array.isArray(urls)) throw new Error("URLs must be an array of strings");
+
   const texts = await Promise.all(urls.map(extractText));
   const cards = await Promise.all(texts.map(generateCards));
   return cards.flat();
