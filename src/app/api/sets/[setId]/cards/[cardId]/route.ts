@@ -38,7 +38,7 @@ export async function PATCH(
   } catch (err) {
     console.error("Error updating card:", err);
     return NextResponse.json(
-      { error: "Failed to update card" },
+      { error: "Failed to update card in set" },
       { status: 500 }
     );
   }
@@ -70,7 +70,7 @@ export async function DELETE(
   } catch (err) {
     console.error("Error deleting card:", err);
     return NextResponse.json(
-      { error: "Failed to delete card" },
+      { error: "Failed to delete card from set" },
       { status: 500 }
     );
   }

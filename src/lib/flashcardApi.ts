@@ -78,7 +78,7 @@ export async function appendCardsToSet(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cards }),
   });
-  if (!res.ok) throw new Error("Failed to append cards");
+  if (!res.ok) throw new Error("Failed to append cards to set");
 }
 
 export async function updateCardInSet(
@@ -91,7 +91,7 @@ export async function updateCardInSet(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error("Failed to update card");
+  if (!res.ok) throw new Error("Failed to update card in set");
 }
 
 export async function deleteCardFromSet(
@@ -101,7 +101,7 @@ export async function deleteCardFromSet(
   const res = await fetch(`/api/sets/${setId}/cards/${cardId}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error("Failed to delete card");
+  if (!res.ok) throw new Error("Failed to delete card from set");
 }
 
 export async function updateSetName(

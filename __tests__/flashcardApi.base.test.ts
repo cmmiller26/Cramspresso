@@ -121,7 +121,7 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
     it("throws an error on failure", async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false });
       await expect(appendCardsToSet(fakeSetId, fakeCards)).rejects.toThrow(
-        "Failed to append cards"
+        "Failed to append cards to set"
       );
     });
   });
@@ -152,7 +152,7 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
       (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false });
       await expect(
         updateCardInSet(fakeSetId, fakeCardId, fakeUpdates)
-      ).rejects.toThrow("Failed to update card");
+      ).rejects.toThrow("Failed to update card in set");
     });
   });
 
@@ -174,7 +174,7 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
     it("throws an error on failure", async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false });
       await expect(deleteCardFromSet(fakeSetId, fakeCardId)).rejects.toThrow(
-        "Failed to delete card"
+        "Failed to delete card from set"
       );
     });
   });
