@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:jest": "jest",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test": "npm run test:jest && npm run test:e2e"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.20.0",
@@ -29,11 +31,11 @@
     "uploadthing": "^7.7.2"
   },
   "devDependencies": {
+    "@clerk/testing": "^1.7.5",
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
-    "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.17.50",
     "@types/react": "^19",
