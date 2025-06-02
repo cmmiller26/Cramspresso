@@ -4,6 +4,12 @@ import { parseCompletionToCards } from "@/lib/flashcards";
 
 export async function POST(req: NextRequest) {
   const { text } = await req.json();
+  if (typeof text !== "string" || text.trim() === "")
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 }
+    );
+
   const completion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [

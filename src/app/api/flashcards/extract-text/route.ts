@@ -4,7 +4,7 @@ import PDFParser, { Output } from "pdf2json";
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url) {
+    if (typeof url !== "string" || url.trim() === "") {
       return NextResponse.json({ error: "Missing URL" }, { status: 400 });
     }
 

@@ -16,7 +16,12 @@ export async function PATCH(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const { question, answer } = await req.json();
-  if (typeof question !== "string" || typeof answer !== "string")
+  if (
+    typeof question !== "string" ||
+    question.trim() === "" ||
+    typeof answer !== "string" ||
+    answer.trim() === ""
+  )
     return NextResponse.json(
       { error: "Invalid request body" },
       { status: 400 }
