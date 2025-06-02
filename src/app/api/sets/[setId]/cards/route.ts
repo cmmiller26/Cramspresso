@@ -22,8 +22,20 @@ export async function POST(
     return NextResponse.json({ error: "Set not found" }, { status: 404 });
 
   const { cards } = await req.json();
-  if (!Array.isArray(cards || cards.length === 0))
+  if (!Array.isArray(cards) || cards.length === 0)
     return NextResponse.json({ error: "Invalid cards data" }, { status: 400 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  cards.forEach((card: any, index) => {
+    if (
+      typeof card?.question !== "string" ||
+      typeof card?.answer !== "string"
+    ) {
+      return NextResponse.json(
+        { error: `Invalid card format at index ${index}` },
+        { status: 400 }
+      );
+    }
+  });
 
   try {
     const result = await prisma.flashcard.createMany({

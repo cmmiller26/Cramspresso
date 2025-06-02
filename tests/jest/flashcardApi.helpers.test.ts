@@ -126,7 +126,7 @@ describe("generateCards helper - payload and JSON shape validation", () => {
       json: async () => ({ cards: invalidCards }),
     });
     await expect(generateCards(fakeText)).rejects.toThrow(
-      "Invalid response: each card must have 'question' and 'answer' strings (error at index 1)"
+      "Invalid Response: card at index 1 is malformed"
     );
   });
 
@@ -140,7 +140,7 @@ describe("generateCards helper - payload and JSON shape validation", () => {
       json: async () => ({ cards: invalidCards }),
     });
     await expect(generateCards(fakeText)).rejects.toThrow(
-      "Invalid response: each card must have 'question' and 'answer' strings (error at index 1)"
+      "Invalid Response: card at index 1 is malformed"
     );
   });
 
@@ -151,7 +151,7 @@ describe("generateCards helper - payload and JSON shape validation", () => {
       json: async () => ({ cards: invalidCards }),
     });
     await expect(generateCards(fakeText)).rejects.toThrow(
-      "Invalid response: each card must have 'question' and 'answer' strings (error at index 1)"
+      "Invalid Response: card at index 1 is malformed"
     );
   });
 });
