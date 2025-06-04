@@ -139,134 +139,137 @@ export default function SetEditor() {
   }
 
   return (
-    <main className="p-8 space-y-6">
-      {loading ? (
-        <p>Loading set...</p>
-      ) : error ? (
-        <p className="text-red-500">Error: {error}</p>
-      ) : (
-        <>
-          <section className="flex items-center justify-between space-x-4">
-            {isEditingName ? (
-              <>
-                <input
-                  className="border p-2 flex-grow"
-                  value={setName}
-                  onChange={(e) => setSetName(e.target.value)}
-                />
-                <Button onClick={saveSetName}>Save</Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setIsEditingName(false)}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold flex-grow">{setName}</h1>
-                <Button onClick={() => setIsEditingName(true)}>
-                  Edit Name
-                </Button>
-                <Button
-                  className="bg-red-500 text-white"
-                  onClick={handleDeleteSet}
-                >
-                  Delete Set
-                </Button>
-              </>
-            )}
-          </section>
+    <>
+      <title>{`${setName} - Set Editor`}</title>
+      <main className="p-8 space-y-6">
+        {loading ? (
+          <p>Loading set...</p>
+        ) : error ? (
+          <p className="text-red-500">Error: {error}</p>
+        ) : (
+          <>
+            <section className="flex items-center justify-between space-x-4">
+              {isEditingName ? (
+                <>
+                  <input
+                    className="border p-2 flex-grow"
+                    value={setName}
+                    onChange={(e) => setSetName(e.target.value)}
+                  />
+                  <Button onClick={saveSetName}>Save</Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsEditingName(false)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-2xl font-bold flex-grow">{setName}</h1>
+                  <Button onClick={() => setIsEditingName(true)}>
+                    Edit Name
+                  </Button>
+                  <Button
+                    className="bg-red-500 text-white"
+                    onClick={handleDeleteSet}
+                  >
+                    Delete Set
+                  </Button>
+                </>
+              )}
+            </section>
 
-          <UploadZone onClientUploadComplete={onUpload} />
+            <UploadZone onClientUploadComplete={onUpload} />
 
-          <section className="space-y-2">
-            <h2 className="text-xl font-semibold">Create New Card</h2>
-            <input
-              className="border p-2 w-full"
-              placeholder="Question"
-              value={newQuestion}
-              onChange={(e) => setNewQuestion(e.target.value)}
-            />
-            <input
-              className="border p-2 w-full"
-              placeholder="Answer"
-              value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-            />
-            <Button
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-              onClick={addNewCard}
-            >
-              Add Card
-            </Button>
-          </section>
+            <section className="space-y-2">
+              <h2 className="text-xl font-semibold">Create New Card</h2>
+              <input
+                className="border p-2 w-full"
+                placeholder="Question"
+                value={newQuestion}
+                onChange={(e) => setNewQuestion(e.target.value)}
+              />
+              <input
+                className="border p-2 w-full"
+                placeholder="Answer"
+                value={newAnswer}
+                onChange={(e) => setNewAnswer(e.target.value)}
+              />
+              <Button
+                className="bg-blue-500 text-white px-4 py-2 rounded"
+                onClick={addNewCard}
+              >
+                Add Card
+              </Button>
+            </section>
 
-          <section>
-            <h2 className="text-xl font-semibold">Cards</h2>
-            <ul className="space-y-4">
-              {cards.map((card, index) => (
-                <li
-                  key={card.id ?? `unsaved-${index}`}
-                  className="border p-3 rounded space-y-2"
-                >
-                  {editingCardId === card.id ? (
-                    <>
-                      <input
-                        className="border p-2 w-full"
-                        value={editingQuestion}
-                        onChange={(e) => setEditingQuestion(e.target.value)}
-                      />
-                      <input
-                        className="border p-2 w-full"
-                        value={editingAnswer}
-                        onChange={(e) => setEditingAnswer(e.target.value)}
-                      />
-                      <div className="space-x-2">
-                        <Button
-                          className="bg-green-500 text-white px-3 py-1 rounded"
-                          onClick={() => saveEditedCard()}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          className="bg-gray-300 px-3 py-1 rounded"
-                          onClick={cancelEdit}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          className="bg-red-500 text-white px-3 py-1 rounded"
-                          onClick={deleteCard}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-semibold">{card.question}</p>
-                      <p>{card.answer}</p>
-                      {card.id ? (
-                        <Button
-                          className="text-sm text-blue-600"
-                          onClick={() => startEditingCard(card)}
-                        >
-                          Edit
-                        </Button>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic">
-                          Unsaved card
-                        </p>
-                      )}
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      )}
-    </main>
+            <section>
+              <h2 className="text-xl font-semibold">Cards</h2>
+              <ul className="space-y-4">
+                {cards.map((card, index) => (
+                  <li
+                    key={card.id ?? `unsaved-${index}`}
+                    className="border p-3 rounded space-y-2"
+                  >
+                    {editingCardId === card.id ? (
+                      <>
+                        <input
+                          className="border p-2 w-full"
+                          value={editingQuestion}
+                          onChange={(e) => setEditingQuestion(e.target.value)}
+                        />
+                        <input
+                          className="border p-2 w-full"
+                          value={editingAnswer}
+                          onChange={(e) => setEditingAnswer(e.target.value)}
+                        />
+                        <div className="space-x-2">
+                          <Button
+                            className="bg-green-500 text-white px-3 py-1 rounded"
+                            onClick={() => saveEditedCard()}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            className="bg-gray-300 px-3 py-1 rounded"
+                            onClick={cancelEdit}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            className="bg-red-500 text-white px-3 py-1 rounded"
+                            onClick={deleteCard}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold">{card.question}</p>
+                        <p>{card.answer}</p>
+                        {card.id ? (
+                          <Button
+                            className="text-sm text-blue-600"
+                            onClick={() => startEditingCard(card)}
+                          >
+                            Edit
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-gray-400 italic">
+                            Unsaved card
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </>
+        )}
+      </main>
+    </>
   );
 }

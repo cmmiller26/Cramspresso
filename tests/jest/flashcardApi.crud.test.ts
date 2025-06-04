@@ -14,11 +14,12 @@ describe("Flashcard API - CRUD endpoints (parameterized)", () => {
 
   type EndpointTest = {
     description: string;
-    fn: (...args: any[]) => Promise<any>;
-    args: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fn: (...args: any[]) => Promise<unknown>;
+    args: unknown[];
     expectedUrl: string;
     expectedMethod: "POST" | "PATCH" | "DELETE";
-    expectedBody?: any;
+    expectedBody?: unknown;
     expectedErrorMsg?: string;
   };
 

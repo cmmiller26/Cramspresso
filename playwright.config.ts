@@ -1,27 +1,38 @@
 import { defineConfig, devices } from "@playwright/test";
-import path from "path";
 
 export default defineConfig({
-  globalSetup: path.join(__dirname, "playwright", "global.setup.ts"),
+  testDir: "./tests/e2e",
   use: {
-    storageState: path.join(__dirname, "playwright", ".clerk", "user.json"),
-    headless: true,
     baseURL: "http://localhost:3000",
+    headless: true,
+    trace: "on-first-retry",
+  },
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
   },
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: "global setup",
+      testMatch: /global\.setup\.ts/,
     },
-
     {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
+      name: "Main tests",
+      testMatch: /.*app\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+      dependencies: ["global setup"],
     },
-
     {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
+      name: "Authenticated tests",
+      testMatch: /.*auth\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "./tests/e2e/.clerk/user.json",
+      },
+      dependencies: ["global setup"],
     },
   ],
 });
