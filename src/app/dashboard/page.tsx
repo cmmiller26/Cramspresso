@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import { NewSetForm } from "@/components/NewSetForm";
 import { Button } from "@/components/ui/button";
 
@@ -14,15 +14,30 @@ interface SetItem {
 }
 
 export default function Dashboard() {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
+
+  const wasSignedInRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn) {
+      wasSignedInRef.current = true;
+      return;
+    }
+    if (!wasSignedInRef.current) {
+      router.push("/sign-in");
+    } else {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
   const [sets, setSets] = useState<SetItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const router = useRouter();
-
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
 
     setLoading(true);
 
@@ -37,17 +52,15 @@ export default function Dashboard() {
         setError(err instanceof Error ? err.message : "Unknown error");
       })
       .finally(() => setLoading(false));
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn]);
+
+  if (!isLoaded || !isSignedIn) return <p>Redirecting to sign-in...</p>;
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Your Flashcard Sets</h1>
-
-      <SignedOut>
-        <p>Please sign in to view or create sets.</p>
-      </SignedOut>
-
-      <SignedIn>
+    <>
+      <title>Dashboard</title>
+      <main className="p-8">
+        <h1 className="text-2xl font-bold mb-6">Your Flashcard Sets</h1>
         <div className="mb-8">
           <NewSetForm onCreate={(id) => router.push(`/sets/${id}`)} />
         </div>
@@ -75,7 +88,7 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </SignedIn>
-    </main>
+      </main>
+    </>
   );
 }

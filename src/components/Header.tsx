@@ -20,10 +20,10 @@ export function Header() {
 
       <div className="flex gap-4">
         <SignedOut>
-          <SignInButton mode="modal">
+          <SignInButton>
             <Button>Sign In</Button>
           </SignInButton>
-          <SignUpButton mode="modal">
+          <SignUpButton>
             <Button>Sign Up</Button>
           </SignUpButton>
         </SignedOut>

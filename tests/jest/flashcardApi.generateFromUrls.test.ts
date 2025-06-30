@@ -106,6 +106,13 @@ describe("generateFromUrls - multiple-URL flattening & edge cases", () => {
     );
   });
 
+  it("throws if called with non-string array elements", async () => {
+    // @ts-expect-error: Testing invalid input
+    await expect(generateFromUrls([123])).rejects.toThrow(
+      "URLs must be an array of strings"
+    );
+  });
+
   it("propagates a fetch rejection (network error) during extraction", async () => {
     (global.fetch as jest.Mock).mockRejectedValueOnce(
       new Error("Network error")

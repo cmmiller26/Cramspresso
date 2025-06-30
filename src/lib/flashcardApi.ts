@@ -35,21 +35,18 @@ export async function generateCards(text: string): Promise<Flashcard[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parsed.cards.forEach((card: any, index: number) => {
     if (
-      typeof card !== "object" ||
-      card === null ||
-      typeof card.question !== "string" ||
-      typeof card.answer !== "string"
+      typeof card?.question !== "string" ||
+      typeof card?.answer !== "string"
     ) {
-      throw new Error(
-        `Invalid response: each card must have \'question\' and \'answer\' strings (error at index ${index})`
-      );
+      throw new Error(`Invalid Response: card at index ${index} is malformed`);
     }
   });
   return parsed.cards as Flashcard[];
 }
 
 export async function generateFromUrls(urls: string[]): Promise<Flashcard[]> {
-  if (!Array.isArray(urls)) throw new Error("URLs must be an array of strings");
+  if (!Array.isArray(urls) || !urls.every((url) => typeof url === "string"))
+    throw new Error("URLs must be an array of strings");
 
   const texts = await Promise.all(urls.map(extractText));
   const cards = await Promise.all(texts.map(generateCards));
@@ -66,7 +63,12 @@ export async function createSetWithCards(
     body: JSON.stringify({ name, cards }),
   });
   if (!res.ok) throw new Error("Failed to create set");
-  return { setId: (await res.json()).id };
+
+  const parsed = await res.json();
+  if (typeof parsed.id !== "string") {
+    throw new Error("Invalid response: `id` field is missing or not a string");
+  }
+  return { setId: parsed.id };
 }
 
 export async function appendCardsToSet(

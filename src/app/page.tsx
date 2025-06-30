@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { NewSetForm } from "@/components/NewSetForm";
 import { UploadZone } from "@/components/UploadZone";
 import { generateFromUrls } from "@/lib/flashcardApi";
@@ -47,6 +47,9 @@ export default function Home() {
   }
 
   return (
-    <main className="p-8 mx-auto max-w-xl space-y-6">{renderStage()}</main>
+    <>
+      <title>Cramspresso</title>
+      <main className="p-8 mx-auto max-w-xl space-y-6">{renderStage()}</main>
+    </>
   );
 }

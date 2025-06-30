@@ -26,6 +26,20 @@ export async function POST(req: NextRequest) {
   const { name, cards } = await req.json();
   if (typeof name !== "string" || !name.trim())
     return NextResponse.json({ error: "Invalid set name" }, { status: 400 });
+  if (!Array.isArray(cards) || cards.length === 0)
+    return NextResponse.json({ error: "Invalid cards data" }, { status: 400 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  cards.forEach((card: any, index) => {
+    if (
+      typeof card?.question !== "string" ||
+      typeof card?.answer !== "string"
+    ) {
+      return NextResponse.json(
+        { error: `Invalid card format at index ${index}` },
+        { status: 400 }
+      );
+    }
+  });
 
   try {
     const newSet = await prisma.flashcardSet.create({
