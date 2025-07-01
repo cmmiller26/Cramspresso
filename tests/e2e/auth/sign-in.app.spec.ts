@@ -1,7 +1,7 @@
 import { clerk } from "@clerk/testing/playwright";
 import { test, expect } from "@playwright/test";
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.describe.configure({ mode: "serial" });
 
 test.describe("Sign-In Flow (Public)", () => {
   test("redirects unauthenticated user, then allows sign-in to reach dashboard", async ({
