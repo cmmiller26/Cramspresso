@@ -106,7 +106,7 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
       });
 
       await expect(createSetWithCards("Test Set", [])).rejects.toThrow(
-        "Invalid response: id field is missing or not a string"
+        "Invalid response: `id` field is missing or not a string" // Added backticks
       );
     });
 
@@ -117,7 +117,7 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
       });
 
       await expect(createSetWithCards("Test Set", [])).rejects.toThrow(
-        "Invalid response: id field is missing or not a string"
+        "Invalid response: `id` field is missing or not a string" // Added backticks
       );
     });
   });
