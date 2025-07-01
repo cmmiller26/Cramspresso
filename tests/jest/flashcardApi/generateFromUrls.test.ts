@@ -120,4 +120,24 @@ describe("generateFromUrls - multiple-URL flattening & edge cases", () => {
     await expect(generateFromUrls([url1])).rejects.toThrow("Network error");
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("throws if called with array containing mixed valid and invalid types", async () => {
+    await expect(
+      generateFromUrls(["valid-url", null, "another-valid-url"] as string[])
+    ).rejects.toThrow("URLs must be an array of strings");
+  });
+
+  it("throws if called with array containing undefined", async () => {
+    // @ts-expect-error: Testing invalid input
+    await expect(generateFromUrls(["valid-url", undefined])).rejects.toThrow(
+      "URLs must be an array of strings"
+    );
+  });
+
+  it("throws if called with array containing boolean", async () => {
+    // @ts-expect-error: Testing invalid input
+    await expect(generateFromUrls([true, "valid-url"])).rejects.toThrow(
+      "URLs must be an array of strings"
+    );
+  });
 });

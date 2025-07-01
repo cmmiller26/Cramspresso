@@ -98,6 +98,28 @@ describe("Flashcard API - basic generateUrls + CRUD happy/failure paths", () => 
         "Failed to create set"
       );
     });
+
+    it("throws error when response is missing id field", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}), // Missing id field
+      });
+
+      await expect(createSetWithCards("Test Set", [])).rejects.toThrow(
+        "Invalid response: id field is missing or not a string"
+      );
+    });
+
+    it("throws error when response id field is not a string", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 123 }), // id is number, not string
+      });
+
+      await expect(createSetWithCards("Test Set", [])).rejects.toThrow(
+        "Invalid response: id field is missing or not a string"
+      );
+    });
   });
 
   describe("appendCardsToSet", () => {
