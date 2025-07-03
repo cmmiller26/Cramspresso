@@ -18,20 +18,18 @@ export default defineConfig({
       testMatch: /global\.setup\.ts/,
     },
     {
-      name: "Main tests",
-      testMatch: /.*app\.spec\.ts/,
-      use: {
-        ...devices["Desktop Chrome"],
-      },
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
       dependencies: ["global setup"],
     },
     {
-      name: "Authenticated tests",
-      testMatch: /.*auth\.spec\.ts/,
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: "./tests/e2e/.clerk/user.json",
-      },
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+      dependencies: ["global setup"],
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
       dependencies: ["global setup"],
     },
   ],
