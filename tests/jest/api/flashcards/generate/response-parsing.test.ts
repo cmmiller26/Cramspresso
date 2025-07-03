@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/flashcards/generate/route";
 import { openai } from "@/lib/openai";
+import { parseCompletionToCards } from "@/lib/flashcards";
 import type {
   ChatCompletion,
   ChatCompletionMessage,
@@ -17,8 +18,17 @@ jest.mock("@/lib/openai", () => ({
   },
 }));
 
+// Mock the flashcards module
+jest.mock("@/lib/flashcards", () => ({
+  parseCompletionToCards: jest.fn(),
+}));
+
 const mockOpenAI = openai.chat.completions.create as jest.MockedFunction<
   typeof openai.chat.completions.create
+>;
+
+const mockParseCompletionToCards = parseCompletionToCards as jest.MockedFunction<
+  typeof parseCompletionToCards
 >;
 
 describe("API Route /api/flashcards/generate - Response Parsing", () => {
@@ -31,6 +41,10 @@ describe("API Route /api/flashcards/generate - Response Parsing", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset mock to use the real implementation by default
+    mockParseCompletionToCards.mockReset();
+    const { parseCompletionToCards } = jest.requireActual("@/lib/flashcards");
+    mockParseCompletionToCards.mockImplementation(parseCompletionToCards);
   });
 
   describe("Invalid OpenAI response structure", () => {
@@ -414,6 +428,43 @@ A: 4`;
         { question: "What is the capital of France?", answer: "Paris" },
         { question: "What is 2 + 2?", answer: "4" },
       ]);
+    });
+  });
+
+  describe("Parsing errors", () => {
+    it("returns 502 when parseCompletionToCards throws an unexpected error", async () => {
+      const mockResponse: ChatCompletion = {
+        id: "test",
+        object: "chat.completion",
+        created: 123456789,
+        model: "gpt-3.5-turbo",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Valid response content",
+              refusal: null,
+            },
+            finish_reason: "stop",
+            logprobs: null,
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      };
+
+      mockOpenAI.mockResolvedValueOnce(mockResponse);
+      mockParseCompletionToCards.mockImplementation(() => {
+        throw new Error("Unexpected parsing error");
+      });
+
+      const response = await POST(createValidRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(data.error).toBe(
+        "Unable to parse the generated content into flashcards. Please try again."
+      );
     });
   });
 });
