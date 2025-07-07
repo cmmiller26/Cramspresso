@@ -8,24 +8,12 @@ export async function POST(
 ) {
   const { setId } = await params;
 
-  const { userId: clerkId } = await auth();
-  if (!clerkId)
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  const user = await prisma.user.findUnique({ where: { clerkId } });
-  if (!user)
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-
-  const set = await prisma.flashcardSet.findFirst({
-    where: { id: setId, userId: user.id },
-  });
-  if (!set)
-    return NextResponse.json({ error: "Set not found" }, { status: 404 });
-
+  // 1. Input validation FIRST
   const { cards } = await req.json();
   if (!Array.isArray(cards) || cards.length === 0)
     return NextResponse.json({ error: "Invalid cards data" }, { status: 400 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  cards.forEach((card: any, index) => {
+  for (let index = 0; index < cards.length; index++) {
+    const card = cards[index];
     if (
       typeof card?.question !== "string" ||
       typeof card?.answer !== "string"
@@ -35,7 +23,22 @@ export async function POST(
         { status: 400 }
       );
     }
+  }
+
+  // 2. Then auth check
+  const { userId: clerkId } = await auth();
+  if (!clerkId)
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const user = await prisma.user.findUnique({ where: { clerkId } });
+  if (!user)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // 3. Then resource existence check
+  const set = await prisma.flashcardSet.findFirst({
+    where: { id: setId, userId: user.id },
   });
+  if (!set)
+    return NextResponse.json({ error: "Set not found" }, { status: 404 });
 
   try {
     const result = await prisma.flashcard.createMany({

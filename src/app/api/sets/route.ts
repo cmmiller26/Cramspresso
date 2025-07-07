@@ -19,17 +19,14 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId)
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-
+  // 1. Input validation FIRST
   const { name, cards } = await req.json();
   if (typeof name !== "string" || !name.trim())
     return NextResponse.json({ error: "Invalid set name" }, { status: 400 });
   if (!Array.isArray(cards) || cards.length === 0)
     return NextResponse.json({ error: "Invalid cards data" }, { status: 400 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  cards.forEach((card: any, index) => {
+  for (let index = 0; index < cards.length; index++) {
+    const card = cards[index];
     if (
       typeof card?.question !== "string" ||
       typeof card?.answer !== "string"
@@ -39,7 +36,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-  });
+  }
+
+  // 2. Then auth check
+  const { userId: clerkId } = await auth();
+  if (!clerkId)
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   try {
     const newSet = await prisma.flashcardSet.create({
