@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const contentType = res.headers.get("content-type") ?? "";
+    // Handle both Headers object and Map object for testing compatibility
+    const contentType = res.headers.get("content-type") || "";
     const buffer = Buffer.from(await res.arrayBuffer());
 
     let text = "";
@@ -44,9 +45,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text });
   } catch (err) {
     console.error("Error extracting text:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    let errorMessage = "Unknown error";
+    if (err instanceof Error) {
+      errorMessage = err.message;
+    } else if (err && typeof err === "object" && "message" in err) {
+      errorMessage = String(err.message);
+    } else if (typeof err === "string") {
+      errorMessage = err;
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
