@@ -8,13 +8,7 @@ export async function PATCH(
 ) {
   const { setId, cardId } = await params;
 
-  const { userId: clerkId } = await auth();
-  if (!clerkId)
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  const user = await prisma.user.findUnique({ where: { clerkId } });
-  if (!user)
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-
+  // 1. Input validation FIRST
   const { question, answer } = await req.json();
   if (
     typeof question !== "string" ||
@@ -26,6 +20,14 @@ export async function PATCH(
       { error: "Invalid request body" },
       { status: 400 }
     );
+
+  // 2. Then auth check
+  const { userId: clerkId } = await auth();
+  if (!clerkId)
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const user = await prisma.user.findUnique({ where: { clerkId } });
+  if (!user)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   try {
     const card = await prisma.flashcard.findUnique({
