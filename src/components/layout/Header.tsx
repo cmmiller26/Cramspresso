@@ -13,25 +13,16 @@ export function Header() {
   return (
     <header className="border-b border-border bg-background">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-primary">
+        <Link
+          href={isSignedIn ? "/dashboard" : "/"}
+          className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity"
+        >
           Cramspresso
         </Link>
 
         <nav className="flex items-center gap-4">
           {isSignedIn ? (
             <>
-              <Link
-                href="/dashboard"
-                className="text-foreground hover:text-primary"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/create"
-                className="text-foreground hover:text-primary"
-              >
-                Create Set
-              </Link>
               <ThemeToggle />
               <SignOutButton>
                 <Button variant="outline">Sign Out</Button>
