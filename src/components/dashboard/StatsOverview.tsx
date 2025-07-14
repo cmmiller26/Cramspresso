@@ -40,11 +40,14 @@ export function StatsOverview({ sets }: StatsOverviewProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 sm:mb-8">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (
-          <Card key={stat.title}>
+          <Card
+            key={stat.title}
+            className="hover:shadow-md transition-shadow duration-200"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {stat.title}

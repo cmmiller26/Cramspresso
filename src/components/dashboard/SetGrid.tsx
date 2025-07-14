@@ -31,9 +31,9 @@ export function SetGrid({ sets, loading, error }: SetGridProps) {
     return (
       <div className="space-y-4">
         <div className="h-10 bg-muted animate-pulse rounded-md" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-36 bg-muted animate-pulse rounded-xl" />
           ))}
         </div>
       </div>
@@ -86,7 +86,7 @@ export function SetGrid({ sets, loading, error }: SetGridProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {filteredSets.map((set) => (
             <SetCard key={set.id} set={set} />
           ))}
