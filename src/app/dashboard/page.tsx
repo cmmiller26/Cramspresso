@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { NewSetForm } from "@/components/NewSetForm";
+import { NewSetForm } from "@/components/dashboard/NewSetForm";
 import { SetGrid } from "@/components/dashboard/SetGrid";
 import { StatsOverview } from "@/components/dashboard/StatsOverview";
 import { Button } from "@/components/ui/button";
@@ -90,10 +90,12 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <NewSetForm
+                variant="dashboard"
                 onCreate={(id) => {
                   router.push(`/sets/${id}`);
                   setShowNewSetForm(false);
                 }}
+                onCancel={() => setShowNewSetForm(false)}
               />
             </CardContent>
           </Card>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { NewSetForm } from "@/components/NewSetForm";
+import { NewSetForm } from "@/components/dashboard/NewSetForm";
 import { UploadZone } from "@/components/UploadZone";
 import { generateFromUrls } from "@/lib/flashcardApi";
 import { Flashcard } from "@/lib/flashcards";
