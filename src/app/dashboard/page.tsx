@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { NewSetForm } from "@/components/NewSetForm";
+import { SetGrid } from "@/components/dashboard/SetGrid";
+import { StatsOverview } from "@/components/dashboard/StatsOverview";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus } from "lucide-react";
 
 interface SetItem {
   id: string;
@@ -35,6 +38,7 @@ export default function Dashboard() {
   const [sets, setSets] = useState<SetItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNewSetForm, setShowNewSetForm] = useState(false);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -59,35 +63,50 @@ export default function Dashboard() {
   return (
     <>
       <title>Dashboard</title>
-      <main className="p-8">
-        <h1 className="text-2xl font-bold mb-6">Your Flashcard Sets</h1>
-        <div className="mb-8">
-          <NewSetForm onCreate={(id) => router.push(`/sets/${id}`)} />
-        </div>
-        {loading ? (
-          <p>Loading your sets...</p>
-        ) : error ? (
-          <p className="text-red-600 mb-4">Error: {error}</p>
-        ) : sets.length === 0 ? (
-          <p>No flashcard sets found. Create a new set to get started!</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sets.map((set) => (
-              <div
-                key={set.id}
-                className="p-4 border rounded-xl hover:shadow transition"
-              >
-                <h2 className="text-lg font-semibold">{set.name}</h2>
-                <p className="text-sm text-gray-600">
-                  {set._count.cards} card{set._count.cards === 1 ? "" : "s"}
-                </p>
-                <Link href={`/sets/${set.id}`}>
-                  <Button className="mt-4">View &amp; Edit</Button>
-                </Link>
-              </div>
-            ))}
+      <main className="max-w-6xl mx-auto p-6 space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage your flashcard sets and track your progress
+            </p>
           </div>
+          <Button
+            onClick={() => setShowNewSetForm(!showNewSetForm)}
+            className="w-fit"
+            size="lg"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create New Set
+          </Button>
+        </div>
+
+        {/* New Set Form */}
+        {showNewSetForm && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Create New Flashcard Set</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NewSetForm
+                onCreate={(id) => {
+                  router.push(`/sets/${id}`);
+                  setShowNewSetForm(false);
+                }}
+              />
+            </CardContent>
+          </Card>
         )}
+
+        {/* Stats Overview */}
+        {!loading && !error && <StatsOverview sets={sets} />}
+
+        {/* Sets Grid */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Your Flashcard Sets</h2>
+          <SetGrid sets={sets} loading={loading} error={error} />
+        </div>
       </main>
     </>
   );
