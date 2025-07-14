@@ -8,7 +8,7 @@ import { SetGrid } from "@/components/dashboard/SetGrid";
 import { StatsOverview } from "@/components/dashboard/StatsOverview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 interface SetItem {
   id: string;
@@ -72,21 +72,38 @@ export default function Dashboard() {
               Manage your flashcard sets and track your progress
             </p>
           </div>
-          <Button
-            onClick={() => setShowNewSetForm(!showNewSetForm)}
-            className="w-fit"
-            size="lg"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create New Set
-          </Button>
+          <div className="flex gap-3">
+            {/* New Upload Flow Button */}
+            <Button
+              onClick={() => router.push("/create")}
+              className="w-fit"
+              size="lg"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload & Generate
+            </Button>
+            {/* Original Create Button (for manual sets) */}
+            <Button
+              variant="outline"
+              onClick={() => setShowNewSetForm(!showNewSetForm)}
+              className="w-fit"
+              size="lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Empty Set
+            </Button>
+          </div>
         </div>
 
         {/* New Set Form */}
         {showNewSetForm && (
           <Card>
             <CardHeader>
-              <CardTitle>Create New Flashcard Set</CardTitle>
+              <CardTitle>Create Empty Flashcard Set</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Create a set manually without uploading content. You can add
+                cards later.
+              </p>
             </CardHeader>
             <CardContent>
               <NewSetForm
