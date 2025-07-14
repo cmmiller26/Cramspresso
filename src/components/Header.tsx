@@ -1,35 +1,54 @@
 "use client";
 
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
-import { Button } from "./ui/button";
+import { useAuth, SignOutButton, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useRouter } from "next/navigation";
 
 export function Header() {
-  return (
-    <header className="flex justify-between items-center p-4 h-16">
-      <nav className="flex gap-4">
-        <Link href="/">Home</Link>
-        <Link href="/dashboard">Dashboard</Link>
-      </nav>
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
 
-      <div className="flex gap-4">
-        <SignedOut>
-          <SignInButton>
-            <Button>Sign In</Button>
-          </SignInButton>
-          <SignUpButton>
-            <Button>Sign Up</Button>
-          </SignUpButton>
-        </SignedOut>
-        <SignedIn>
-          <UserButton />
-        </SignedIn>
+  return (
+    <header className="border-b border-border bg-background">
+      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <Link href="/" className="text-2xl font-bold text-primary">
+          Cramspresso
+        </Link>
+
+        <nav className="flex items-center gap-4">
+          {isSignedIn ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="text-foreground hover:text-primary"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/create"
+                className="text-foreground hover:text-primary"
+              >
+                Create Set
+              </Link>
+              <ThemeToggle />
+              <SignOutButton>
+                <Button variant="outline">Sign Out</Button>
+              </SignOutButton>
+            </>
+          ) : (
+            <>
+              <ThemeToggle />
+              <SignInButton mode="modal">
+                <Button variant="outline">Sign In</Button>
+              </SignInButton>
+              <Button onClick={() => router.push("/sign-up")}>
+                Get Started
+              </Button>
+            </>
+          )}
+        </nav>
       </div>
     </header>
   );
