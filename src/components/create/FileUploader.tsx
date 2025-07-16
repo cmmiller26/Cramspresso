@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UploadDropzone } from "@/lib/uploadthing";
+import { UploadZone } from "@/components/shared/UploadZone";
 import { ClientUploadedFileData } from "uploadthing/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,8 +37,8 @@ export function FileUploader({
   };
 
   const handleTextSubmit = () => {
-    if (textInput.trim().length < 50) {
-      setUploadError("Please enter at least 50 characters for better results");
+    if (textInput.trim().length === 0) {
+      setUploadError("Please enter some text to generate flashcards");
       return;
     }
     setUploadError(null);
@@ -76,7 +76,7 @@ export function FileUploader({
             <textarea
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
-              placeholder="Paste your study material here... (minimum 50 characters)"
+              placeholder="Paste your study material here..."
               className="w-full h-40 p-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={isExtracting}
             />
@@ -91,11 +91,6 @@ export function FileUploader({
             <div className="flex justify-between items-center">
               <p className="text-sm text-muted-foreground">
                 {textInput.length} characters
-                {textInput.length < 50 && (
-                  <span className="text-destructive ml-1">
-                    (minimum 50 required)
-                  </span>
-                )}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -107,7 +102,7 @@ export function FileUploader({
                 </Button>
                 <Button
                   onClick={handleTextSubmit}
-                  disabled={isExtracting || textInput.trim().length < 50}
+                  disabled={isExtracting || textInput.trim().length === 0}
                 >
                   {isExtracting ? "Processing..." : "Continue"}
                 </Button>
@@ -137,28 +132,11 @@ export function FileUploader({
           )}
 
           <div className="space-y-4">
-            <UploadDropzone
-              endpoint="pdfAndTxt"
+            <UploadZone
               onClientUploadComplete={handleUploadComplete}
               onUploadError={handleUploadError}
               disabled={isExtracting}
-              config={{
-                mode: "auto",
-              }}
-              appearance={{
-                container:
-                  "border-2 border-dashed border-border rounded-lg bg-muted/30 p-8",
-                uploadIcon: "text-muted-foreground",
-                label: "text-foreground font-medium",
-                allowedContent: "text-muted-foreground text-sm",
-                button:
-                  "bg-primary text-primary-foreground hover:bg-primary/90",
-              }}
             />
-
-            <p className="text-sm text-muted-foreground text-center">
-              Supports PDF, TXT, DOCX files up to 10MB
-            </p>
           </div>
         </CardContent>
       </Card>

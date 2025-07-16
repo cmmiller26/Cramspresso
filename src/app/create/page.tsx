@@ -224,12 +224,16 @@ export default function CreatePage() {
           <CardHeader className="text-center">
             <div
               className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
-                state.step === "upload"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-primary/10"
+                state.step === "upload" ? "bg-primary" : "bg-primary/10"
               }`}
             >
-              <Upload className="w-6 h-6 text-primary" />
+              <Upload
+                className={`w-6 h-6 ${
+                  state.step === "upload"
+                    ? "text-primary-foreground"
+                    : "text-primary"
+                }`}
+              />
             </div>
             <CardTitle className="text-foreground">1. Upload</CardTitle>
             <CardDescription>
@@ -249,11 +253,17 @@ export default function CreatePage() {
             <div
               className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
                 state.step === "preview" || state.step === "settings"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary"
                   : "bg-primary/10"
               }`}
             >
-              <Brain className="w-6 h-6 text-primary" />
+              <Brain
+                className={`w-6 h-6 ${
+                  state.step === "preview" || state.step === "settings"
+                    ? "text-primary-foreground"
+                    : "text-primary"
+                }`}
+              />
             </div>
             <CardTitle className="text-foreground">2. Generate</CardTitle>
             <CardDescription>
@@ -273,11 +283,17 @@ export default function CreatePage() {
             <div
               className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
                 state.step === "generating" || state.step === "complete"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary"
                   : "bg-primary/10"
               }`}
             >
-              <FileText className="w-6 h-6 text-primary" />
+              <FileText
+                className={`w-6 h-6 ${
+                  state.step === "generating" || state.step === "complete"
+                    ? "text-primary-foreground"
+                    : "text-primary"
+                }`}
+              />
             </div>
             <CardTitle className="text-foreground">3. Review</CardTitle>
             <CardDescription>
