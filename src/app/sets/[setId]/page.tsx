@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { UploadZone } from "@/components/UploadZone";
+import { UploadZone } from "@/components/shared/UploadZone";
 import {
   appendCardsToSet,
   generateFromUrls,

@@ -27,7 +27,7 @@ export function FileUploader({
     if (files && files.length > 0) {
       const file = files[0];
       setUploadError(null);
-      onFileUploaded(file.url, file.name);
+      onFileUploaded(file.ufsUrl, file.name);
     }
   };
 

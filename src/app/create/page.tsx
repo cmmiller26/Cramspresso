@@ -148,7 +148,8 @@ export default function CreatePage() {
       }));
 
       // Redirect to review page with cards data
-      // For now, we'll simulate the redirect
+      // For now, we'll just redirect and let the review page handle it
+      // In the future, we can pass data via URL params or session storage
       setTimeout(() => {
         router.push("/create/review");
       }, 2000);
