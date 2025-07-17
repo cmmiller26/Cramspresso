@@ -1,26 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { redirect, useParams } from "next/navigation";
-import { StudyCard } from "@/components/study/StudyCard";
-import { StudyProgress } from "@/components/study/StudyProgress";
-import { StudyControls } from "@/components/study/StudyControls";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { StudyInterface } from "@/components/study/StudyInterface";
+import { StudyComplete } from "@/components/study/StudyComplete";
+import {
+  StudyErrorState,
+  StudyNoCardsState,
+} from "@/components/study/StudyErrorStates";
+import { useStudyKeyboard } from "@/components/study/useStudyKeyboard";
+import type { Flashcard, FlashcardSet } from "@/lib/flashcards";
 
-interface Flashcard {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-interface FlashcardSet {
-  id: string;
-  name: string;
-  cards: Flashcard[];
-  userId: string;
+interface StudySession {
+  startTime: Date;
+  endTime?: Date;
+  totalCards: number;
+  studiedCards: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
 }
 
 export default function StudyPage() {
@@ -28,16 +26,30 @@ export default function StudyPage() {
   const params = useParams();
   const setId = params.setId as string;
 
+  // Core state
   const [set, setSet] = useState<FlashcardSet | null>(null);
+  const [studyCards, setStudyCards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Study tracking
   const [studiedCards, setStudiedCards] = useState<string[]>([]);
   const [correctAnswers, setCorrectAnswers] = useState<string[]>([]);
   const [incorrectAnswers, setIncorrectAnswers] = useState<string[]>([]);
+  const [skippedCards, setSkippedCards] = useState<string[]>([]);
+  const [missedCards, setMissedCards] = useState<Flashcard[]>([]);
+  const [studySession, setStudySession] = useState<StudySession | null>(null);
+
+  // UI state
   const [shuffled, setShuffled] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [studyCards, setStudyCards] = useState<Flashcard[]>([]);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [isReviewingMissed, setIsReviewingMissed] = useState(false);
+  const [feedback, setFeedback] = useState<
+    "correct" | "incorrect" | "skipped" | null
+  >(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,6 +71,15 @@ export default function StudyPage() {
         const data = await response.json();
         setSet(data);
         setStudyCards(data.cards);
+
+        // Initialize study session
+        setStudySession({
+          startTime: new Date(),
+          totalCards: data.cards.length,
+          studiedCards: 0,
+          correctAnswers: 0,
+          incorrectAnswers: 0,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -69,8 +90,33 @@ export default function StudyPage() {
     fetchSet();
   }, [setId, isSignedIn]);
 
+  // Clear feedback when card changes
+  useEffect(() => {
+    setFeedback(null);
+    setIsTransitioning(false);
+  }, [currentIndex]);
+
+  // Reset session data
+  const resetSession = useCallback(() => {
+    if (!set) return;
+
+    setStudiedCards([]);
+    setCorrectAnswers([]);
+    setIncorrectAnswers([]);
+    setSkippedCards([]);
+    setMissedCards([]);
+    setIsReviewingMissed(false);
+    setStudySession({
+      startTime: new Date(),
+      totalCards: set.cards.length,
+      studiedCards: 0,
+      correctAnswers: 0,
+      incorrectAnswers: 0,
+    });
+  }, [set]);
+
   // Shuffle cards
-  const shuffleCards = () => {
+  const shuffleCards = useCallback(() => {
     if (!set) return;
 
     const shuffledCards = [...set.cards].sort(() => Math.random() - 0.5);
@@ -78,236 +124,283 @@ export default function StudyPage() {
     setShuffled(true);
     setCurrentIndex(0);
     setShowAnswer(false);
-    setStudiedCards([]);
-    setCorrectAnswers([]);
-    setIncorrectAnswers([]);
-  };
+    setFeedback(null);
+    setIsTransitioning(false);
+    resetSession();
+  }, [set, resetSession]);
 
   // Reset to original order
-  const resetCards = () => {
+  const resetCards = useCallback(() => {
     if (!set) return;
 
     setStudyCards([...set.cards]);
     setShuffled(false);
     setCurrentIndex(0);
     setShowAnswer(false);
-    setStudiedCards([]);
-    setCorrectAnswers([]);
-    setIncorrectAnswers([]);
-  };
+    setFeedback(null);
+    setIsTransitioning(false);
+    resetSession();
+  }, [set, resetSession]);
 
-  // Handle next card
-  const handleNext = (gotItRight?: boolean) => {
-    if (!studyCards.length) return;
+  // Handle showing answer
+  const handleShowAnswer = useCallback(() => {
+    setShowAnswer(true);
+  }, []);
 
-    const currentCard = studyCards[currentIndex];
+  // Handle previous card - clears any previous answer for that card
+  const handlePrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      const prevCardId = studyCards[currentIndex - 1]?.id;
 
-    // Mark current card as studied and track correct/incorrect
-    if (currentCard && !studiedCards.includes(currentCard.id)) {
+      if (prevCardId) {
+        // Remove previous card from all answer arrays to reset it
+        setStudiedCards((prev) => prev.filter((id) => id !== prevCardId));
+        setCorrectAnswers((prev) => prev.filter((id) => id !== prevCardId));
+        setIncorrectAnswers((prev) => prev.filter((id) => id !== prevCardId));
+        setSkippedCards((prev) => prev.filter((id) => id !== prevCardId));
+        setMissedCards((prev) => prev.filter((card) => card.id !== prevCardId));
+
+        // Update session stats
+        setStudySession((prev) =>
+          prev
+            ? {
+                ...prev,
+                studiedCards: Math.max(0, prev.studiedCards - 1),
+                correctAnswers: correctAnswers.includes(prevCardId)
+                  ? Math.max(0, prev.correctAnswers - 1)
+                  : prev.correctAnswers,
+                incorrectAnswers: incorrectAnswers.includes(prevCardId)
+                  ? Math.max(0, prev.incorrectAnswers - 1)
+                  : prev.incorrectAnswers,
+              }
+            : null
+        );
+      }
+
+      setCurrentIndex((prev) => prev - 1);
+      setShowAnswer(false);
+      setFeedback(null);
+      setIsTransitioning(false);
+    }
+  }, [currentIndex, studyCards, correctAnswers, incorrectAnswers]);
+
+  // Handle next card with smart animation
+  const handleNext = useCallback(
+    (gotItRight?: boolean) => {
+      if (!studyCards.length || !studySession || isTransitioning) return;
+
+      const currentCard = studyCards[currentIndex];
+      if (!currentCard || studiedCards.includes(currentCard.id)) return;
+
+      // Determine if we should show animation
+      // Show animation for:
+      // 1. When answer is visible and user makes a choice (Yes/No)
+      // 2. When skipping (right arrow or skip button) regardless of answer visibility
+      const shouldShowAnimation =
+        (showAnswer && (gotItRight === true || gotItRight === false)) || // Yes/No with answer shown
+        gotItRight === undefined; // Skip action (right arrow or skip button)
+
+      // Set feedback based on choice
+      let feedbackType: "correct" | "incorrect" | "skipped" | null = null;
+      if (gotItRight === true) feedbackType = "correct";
+      else if (gotItRight === false) feedbackType = "incorrect";
+      else feedbackType = "skipped";
+
+      // Update tracking arrays
       setStudiedCards((prev) => [...prev, currentCard.id]);
 
       if (gotItRight === true) {
         setCorrectAnswers((prev) => [...prev, currentCard.id]);
       } else if (gotItRight === false) {
         setIncorrectAnswers((prev) => [...prev, currentCard.id]);
+        setMissedCards((prev) => [...prev, currentCard]);
+      } else {
+        setSkippedCards((prev) => [...prev, currentCard.id]);
       }
-    }
 
-    // Move to next card
-    if (currentIndex < studyCards.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setShowAnswer(false);
-    }
-  };
+      // Update session stats
+      setStudySession((prev) =>
+        prev
+          ? {
+              ...prev,
+              studiedCards: prev.studiedCards + 1,
+              correctAnswers:
+                gotItRight === true
+                  ? prev.correctAnswers + 1
+                  : prev.correctAnswers,
+              incorrectAnswers:
+                gotItRight === false
+                  ? prev.incorrectAnswers + 1
+                  : prev.incorrectAnswers,
+            }
+          : null
+      );
 
-  // Handle showing answer
-  const handleShowAnswer = () => {
-    setShowAnswer(true);
-  };
+      if (shouldShowAnimation) {
+        // Show animation then advance
+        setFeedback(feedbackType);
+        setIsTransitioning(true);
+
+        setTimeout(() => {
+          // Move to next card or complete
+          if (currentIndex < studyCards.length - 1) {
+            setCurrentIndex((prev) => prev + 1);
+            setShowAnswer(false);
+          } else {
+            setStudySession((prev) =>
+              prev ? { ...prev, endTime: new Date() } : null
+            );
+          }
+          setFeedback(null);
+          setIsTransitioning(false);
+        }, 800);
+      } else {
+        // This case should rarely happen now, but keeping for safety
+        if (currentIndex < studyCards.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+          setShowAnswer(false);
+        } else {
+          setStudySession((prev) =>
+            prev ? { ...prev, endTime: new Date() } : null
+          );
+        }
+      }
+    },
+    [
+      studyCards,
+      studySession,
+      currentIndex,
+      studiedCards,
+      showAnswer,
+      isTransitioning,
+    ]
+  );
 
   // Restart study session
-  const handleRestart = () => {
+  const handleRestart = useCallback(() => {
+    if (!set) return;
+
+    setStudyCards([...set.cards]);
+    setShuffled(false);
     setCurrentIndex(0);
     setShowAnswer(false);
+    setFeedback(null);
+    setIsTransitioning(false);
+    resetSession();
+  }, [set, resetSession]);
+
+  // Start reviewing missed/skipped cards
+  const startReviewSession = useCallback(() => {
+    const cardsToReview = [...missedCards];
+
+    // Add skipped cards to review
+    const skippedCardObjects =
+      set?.cards.filter((card) => skippedCards.includes(card.id)) || [];
+    skippedCardObjects.forEach((card) => {
+      if (!cardsToReview.find((c) => c.id === card.id)) {
+        cardsToReview.push(card);
+      }
+    });
+
+    if (cardsToReview.length === 0) return;
+
+    setStudyCards(cardsToReview);
+    setIsReviewingMissed(true);
+    setCurrentIndex(0);
+    setShowAnswer(false);
+    setFeedback(null);
+    setIsTransitioning(false);
     setStudiedCards([]);
     setCorrectAnswers([]);
     setIncorrectAnswers([]);
-  };
+    setSkippedCards([]);
+    setMissedCards([]);
 
+    // Start new session for review cards
+    setStudySession({
+      startTime: new Date(),
+      totalCards: cardsToReview.length,
+      studiedCards: 0,
+      correctAnswers: 0,
+      incorrectAnswers: 0,
+    });
+  }, [missedCards, skippedCards, set]);
+
+  // Toggle keyboard help
+  const toggleKeyboardHelp = useCallback(() => {
+    setShowKeyboardHelp((prev) => !prev);
+  }, []);
+
+  // Set up keyboard shortcuts
+  useStudyKeyboard({
+    showAnswer,
+    currentIndex,
+    onShowAnswer: handleShowAnswer,
+    onNext: handleNext,
+    onPrevious: handlePrevious,
+    onShuffle: shuffleCards,
+    onRestart: handleRestart,
+    onToggleHelp: toggleKeyboardHelp,
+  });
+
+  // Loading state
   if (!isLoaded || isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading flashcard set...</p>
-        </div>
-      </div>
-    );
+    return null; // loading.tsx handles this
   }
 
+  // Error state
   if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Error</h1>
-          <p className="text-muted-foreground mb-6">{error}</p>
-          <Link href="/dashboard">
-            <Button>Back to Dashboard</Button>
-          </Link>
-        </div>
-      </div>
-    );
+    return <StudyErrorState error={error} />;
   }
 
+  // No cards state
   if (!set || !studyCards.length) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h1 className="text-2xl font-bold text-foreground mb-4">
-            No Cards Found
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            This flashcard set doesn&apos;t contain any cards to study.
-          </p>
-          <Link href="/dashboard">
-            <Button>Back to Dashboard</Button>
-          </Link>
-        </div>
-      </div>
-    );
+    return <StudyNoCardsState />;
   }
 
-  const currentCard = studyCards[currentIndex];
-  const isLastCard = currentIndex === studyCards.length - 1;
   const isComplete = studiedCards.length === studyCards.length;
 
-  if (isComplete) {
-    const correctCount = correctAnswers.length;
-    const incorrectCount = incorrectAnswers.length;
-    const skippedCount = studyCards.length - correctCount - incorrectCount;
-    const percentage =
-      studyCards.length > 0
-        ? Math.round((correctCount / studyCards.length) * 100)
-        : 0;
-
+  // Completion state
+  if (isComplete && studySession) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h1 className="text-2xl font-bold text-foreground mb-4">
-            Study Complete!
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            You&apos;ve completed studying all {studyCards.length} cards in
-            &quot;
-            {set.name}&quot;.
-          </p>
-
-          {/* Results Summary */}
-          <div className="bg-card border border-border rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-foreground mb-3">Your Results</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-green-600 dark:text-green-400">
-                  ✓ Correct:
-                </span>
-                <span className="font-medium">{correctCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-red-600 dark:text-red-400">
-                  ✗ Incorrect:
-                </span>
-                <span className="font-medium">{incorrectCount}</span>
-              </div>
-              {skippedCount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">— Skipped:</span>
-                  <span className="font-medium">{skippedCount}</span>
-                </div>
-              )}
-              <div className="border-t border-border pt-2 mt-2">
-                <div className="flex justify-between font-semibold">
-                  <span>Score:</span>
-                  <span
-                    className={
-                      percentage >= 70
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }
-                  >
-                    {percentage}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <Button onClick={handleRestart} className="w-full">
-              Study Again
-            </Button>
-            <Link href={`/sets/${setId}`}>
-              <Button variant="outline" className="w-full">
-                View Set Details
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button variant="ghost" className="w-full">
-                Back to Dashboard
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
+      <StudyComplete
+        setId={setId}
+        setName={set.name}
+        studyCards={studyCards}
+        correctAnswers={correctAnswers}
+        incorrectAnswers={incorrectAnswers}
+        skippedCards={skippedCards}
+        missedCards={missedCards}
+        studySession={studySession}
+        isReviewingMissed={isReviewingMissed}
+        onRestart={handleRestart}
+        onStartReviewSession={startReviewSession}
+      />
     );
   }
 
+  // Main study interface
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <Link href={`/sets/${setId}`}>
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Set
-            </Button>
-          </Link>
-          <h1 className="text-xl font-semibold text-foreground text-center flex-1">
-            Studying: {set.name}
-          </h1>
-          <div className="w-[100px]" /> {/* Spacer for centering */}
-        </div>
-
-        {/* Progress */}
-        <div className="mb-6">
-          <StudyProgress
-            currentIndex={currentIndex}
-            totalCards={studyCards.length}
-            studiedCards={studiedCards.length}
-          />
-        </div>
-
-        {/* Study Controls */}
-        <div className="mb-6">
-          <StudyControls
-            shuffled={shuffled}
-            onShuffle={shuffleCards}
-            onReset={resetCards}
-            onRestart={handleRestart}
-          />
-        </div>
-
-        {/* Study Card */}
-        <div className="flex justify-center">
-          <StudyCard
-            flashcard={currentCard}
-            showAnswer={showAnswer}
-            onShowAnswer={handleShowAnswer}
-            onNext={handleNext}
-            isLastCard={isLastCard}
-          />
-        </div>
-      </div>
-    </div>
+    <StudyInterface
+      setId={setId}
+      setName={set.name}
+      studyCards={studyCards}
+      currentIndex={currentIndex}
+      showAnswer={showAnswer}
+      shuffled={shuffled}
+      showKeyboardHelp={showKeyboardHelp}
+      isReviewingMissed={isReviewingMissed}
+      studySession={studySession}
+      studiedCards={studiedCards}
+      feedback={feedback}
+      isTransitioning={isTransitioning}
+      onShowAnswer={handleShowAnswer}
+      onNext={handleNext}
+      onPrevious={handlePrevious}
+      onShuffle={shuffleCards}
+      onReset={resetCards}
+      onRestart={handleRestart}
+      onToggleKeyboardHelp={toggleKeyboardHelp}
+    />
   );
 }
