@@ -1,10 +1,20 @@
-export interface Flashcard {
-  id?: string;
+interface CreateFlashcard {
   question: string;
   answer: string;
 }
 
-export function parseCompletionToCards(text: string): Flashcard[] {
+export interface Flashcard extends CreateFlashcard {
+  id: string;
+}
+
+export interface FlashcardSet {
+  id: string;
+  name: string;
+  cards: Flashcard[];
+  userId: string;
+}
+
+export function parseCompletionToCards(text: string): CreateFlashcard[] {
   // Handle empty or whitespace-only input
   if (!text || text.trim() === "") {
     return [];
@@ -50,7 +60,7 @@ export function parseCompletionToCards(text: string): Flashcard[] {
   }
 
   // Fall back to Q: A: format parsing using regex
-  const cards: Flashcard[] = [];
+  const cards: CreateFlashcard[] = [];
 
   // Split text into potential Q: A: blocks and process each one
   // This prevents capturing across multiple Q: A: pairs
