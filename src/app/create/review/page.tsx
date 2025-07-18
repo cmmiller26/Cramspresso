@@ -133,8 +133,8 @@ export default function ReviewPage() {
           <NewSetForm
             cards={cards}
             variant="dashboard"
-            onCreate={() => {
-              router.push(`/dashboard`);
+            onCreate={(setId) => {
+              router.push(`/sets/${setId}`); // Detail view instead of dashboard
             }}
             onCancel={() => router.push("/create")}
           />

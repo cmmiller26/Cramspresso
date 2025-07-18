@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Eye, BookOpen } from "lucide-react";
 
 interface SetItem {
   id: string;
@@ -31,11 +32,15 @@ export function SetCard({ set }: SetCardProps) {
       <CardContent>
         <div className="flex flex-col gap-2">
           <Link href={`/sets/${set.id}`} className="w-full">
-            <Button className="w-full">View & Edit</Button>
+            <Button className="w-full">
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </Button>
           </Link>
           {cardCount > 0 && (
             <Link href={`/study/${set.id}`} className="w-full">
               <Button variant="outline" className="w-full">
+                <BookOpen className="h-4 w-4 mr-2" />
                 Study Now
               </Button>
             </Link>

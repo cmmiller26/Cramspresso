@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { SetCard } from "./SetCard";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { BookOpen, Eye, Hash } from "lucide-react";
 
 interface SetItem {
   id: string;
@@ -11,31 +11,29 @@ interface SetItem {
   _count: { cards: number };
 }
 
-interface SetGridProps {
+interface Props {
   sets: SetItem[];
   loading: boolean;
   error: string | null;
 }
 
-export function SetGrid({ sets, loading, error }: SetGridProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const filteredSets = useMemo(() => {
-    if (!searchTerm.trim()) return sets;
-    return sets.filter((set) =>
-      set.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [sets, searchTerm]);
+export function SetGrid({ sets, loading, error }: Props) {
+  const router = useRouter();
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="h-10 bg-muted animate-pulse rounded-md" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-36 bg-muted animate-pulse rounded-xl" />
-          ))}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="space-y-3">
+                <div className="h-6 bg-muted rounded w-3/4"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+                <div className="h-8 bg-muted rounded w-full"></div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
@@ -43,13 +41,10 @@ export function SetGrid({ sets, loading, error }: SetGridProps) {
   if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-destructive mb-4">Error: {error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="text-primary hover:underline"
-        >
-          Try again
-        </button>
+        <p className="text-muted-foreground mb-4">
+          Error loading sets: {error}
+        </p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
   }
@@ -57,41 +52,72 @@ export function SetGrid({ sets, loading, error }: SetGridProps) {
   if (sets.length === 0) {
     return (
       <div className="text-center py-12">
-        <h3 className="text-lg font-semibold mb-2">No flashcard sets yet</h3>
-        <p className="text-muted-foreground">
-          Create your first set to get started!
-        </p>
+        <div className="max-w-sm mx-auto">
+          <h3 className="text-lg font-semibold mb-2">No flashcard sets yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first set by uploading documents or starting from
+            scratch.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => router.push("/create")}>
+              Upload & Generate
+            </Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Create Empty Set
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search your sets..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {sets.map((set) => (
+        <Card key={set.id} className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Set Info */}
+              <div>
+                <h3 className="font-semibold text-lg line-clamp-2 mb-2">
+                  {set.name}
+                </h3>
+                <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                  <Hash className="h-4 w-4" />
+                  <span>
+                    {set._count.cards}{" "}
+                    {set._count.cards === 1 ? "card" : "cards"}
+                  </span>
+                </div>
+              </div>
 
-      {/* Results */}
-      {filteredSets.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            No sets found matching &ldquo;{searchTerm}&rdquo;
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {filteredSets.map((set) => (
-            <SetCard key={set.id} set={set} />
-          ))}
-        </div>
-      )}
+              {/* Actions */}
+              <div className="flex gap-2">
+                {/* View Details - Primary Action */}
+                <Button
+                  onClick={() => router.push(`/sets/${set.id}`)}
+                  className="flex-1"
+                  size="sm"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View
+                </Button>
+
+                {/* Quick Study */}
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/study/${set.id}`)}
+                  disabled={set._count.cards === 0}
+                  size="sm"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Study
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

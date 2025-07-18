@@ -4,12 +4,12 @@ import { FormEvent, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Flashcard } from "@/lib/flashcards";
+import { CreateFlashcard } from "@/lib/flashcards";
 import { createSetWithCards } from "@/lib/flashcardApi";
 import { Loader2, X } from "lucide-react";
 
 interface Props {
-  cards?: Flashcard[];
+  cards?: CreateFlashcard[];
   onCreate: (setId: string) => void;
   onCancel?: () => void;
   variant?: "dashboard" | "inline";

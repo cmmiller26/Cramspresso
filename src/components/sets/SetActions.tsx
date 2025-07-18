@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { BookOpen, Edit, Trash2, Download, ArrowLeft } from "lucide-react";
+import { BookOpen, Edit, Trash2, Download } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,16 +54,6 @@ export function SetActions({
 
   return (
     <div className="space-y-4">
-      {/* Back to Dashboard */}
-      <Button
-        variant="ghost"
-        onClick={() => router.push("/dashboard")}
-        className="mb-2"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Button>
-
       {/* Main Actions */}
       <div className="flex flex-wrap gap-3">
         <Button

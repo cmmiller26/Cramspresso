@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { ArrowLeft } from "lucide-react";
 import { SetOverview } from "@/components/sets/SetOverview";
 import { SetActions } from "@/components/sets/SetActions";
 import { CardList } from "@/components/sets/CardList";
+import { Button } from "@/components/ui/button";
 import { Flashcard } from "@/lib/flashcards";
 import { deleteSet } from "@/lib/flashcardApi";
 
@@ -96,6 +98,16 @@ export default function SetDetailView() {
         {setData?.name ? `${setData.name} - Cramspresso` : "Loading..."}
       </title>
       <main className="max-w-4xl mx-auto p-6 space-y-6">
+        {/* Back Navigation */}
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/dashboard")}
+          className="mb-2"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+
         {/* Set Overview */}
         <SetOverview
           setName={setData?.name || ""}
