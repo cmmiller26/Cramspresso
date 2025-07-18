@@ -1,4 +1,4 @@
-import { Flashcard } from "./flashcards";
+import { CreateFlashcard, Flashcard } from "./flashcards";
 
 export async function extractText(url: string): Promise<string> {
   const res = await fetch("/api/flashcards/extract-text", {
@@ -55,7 +55,7 @@ export async function generateFromUrls(urls: string[]): Promise<Flashcard[]> {
 
 export async function createSetWithCards(
   name: string,
-  cards: Flashcard[]
+  cards: CreateFlashcard[]
 ): Promise<{ setId: string }> {
   const res = await fetch("/api/sets", {
     method: "POST",
@@ -73,7 +73,7 @@ export async function createSetWithCards(
 
 export async function appendCardsToSet(
   setId: string,
-  cards: Flashcard[]
+  cards: CreateFlashcard[]
 ): Promise<void> {
   const res = await fetch(`/api/sets/${setId}/cards`, {
     method: "POST",

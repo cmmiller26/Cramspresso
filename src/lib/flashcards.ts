@@ -1,4 +1,4 @@
-interface CreateFlashcard {
+export interface CreateFlashcard {
   question: string;
   answer: string;
 }
