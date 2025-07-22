@@ -119,7 +119,12 @@ export default function Dashboard() {
         )}
 
         {/* Stats Overview */}
-        {!loading && !error && <StatsOverview sets={sets} />}
+        <StatsOverview
+          sets={sets}
+          loading={loading}
+          error={error}
+          onRetry={() => window.location.reload()}
+        />
 
         {/* Sets Grid */}
         <div>

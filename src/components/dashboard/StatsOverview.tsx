@@ -1,7 +1,9 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, CreditCard, TrendingUp } from "lucide-react";
+import { StatsOverviewSkeleton } from "@/components/shared/SkeletonLoader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatsOverviewError } from "../shared/ErrorStates";
 
 interface SetItem {
   id: string;
@@ -11,9 +13,21 @@ interface SetItem {
 
 interface StatsOverviewProps {
   sets: SetItem[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
-export function StatsOverview({ sets }: StatsOverviewProps) {
+export function StatsOverview({
+  sets,
+  loading = false,
+  error,
+  onRetry,
+}: StatsOverviewProps) {
+  if (loading) return <StatsOverviewSkeleton />;
+
+  if (error) return <StatsOverviewError onRetry={onRetry} />;
+
   const totalSets = sets.length;
   const totalCards = sets.reduce((sum, set) => sum + set._count.cards, 0);
   const avgCardsPerSet = totalSets > 0 ? Math.round(totalCards / totalSets) : 0;
