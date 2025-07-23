@@ -15,6 +15,8 @@ interface StudyCardProps {
   isLastCard: boolean;
   feedback: "correct" | "incorrect" | "skipped" | null;
   isTransitioning: boolean;
+  // NEW: Add disabled prop for Phase 5.2
+  disabled?: boolean;
 }
 
 export function StudyCard({
@@ -25,9 +27,11 @@ export function StudyCard({
   isLastCard,
   feedback,
   isTransitioning,
+  disabled = false, // NEW: Default to false
 }: StudyCardProps) {
   const flipCard = () => {
-    if (!showAnswer && !isTransitioning) {
+    // NEW: Respect disabled state
+    if (!showAnswer && !isTransitioning && !disabled) {
       onShowAnswer();
     }
   };
@@ -76,12 +80,16 @@ export function StudyCard({
       {/* Flashcard Container - 3D Flip Animation */}
       <div className="h-[400px] relative mb-6">
         <div
-          className="w-full h-full cursor-pointer"
+          className={`w-full h-full ${
+            !disabled ? "cursor-pointer" : "cursor-not-allowed"
+          }`} // NEW: Update cursor based on disabled state
           style={{ perspective: "1000px" }}
           onClick={flipCard}
         >
           <div
-            className="relative w-full h-full transition-transform duration-700 ease-in-out"
+            className={`relative w-full h-full transition-transform duration-700 ease-in-out ${
+              disabled ? "opacity-60" : ""
+            }`} // NEW: Visual feedback when disabled
             style={{
               transformStyle: "preserve-3d",
               transform: showAnswer ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -98,7 +106,7 @@ export function StudyCard({
               <div
                 className={`bg-card border border-border rounded-lg shadow-lg p-8 h-full flex flex-col justify-center items-center text-center hover:shadow-xl transition-all duration-300 ${
                   feedback ? getFeedbackColors() : ""
-                }`}
+                } ${disabled ? "hover:shadow-lg" : ""}`} // NEW: Disable hover effect when disabled
               >
                 {feedback && !showAnswer ? (
                   // Show feedback overlay on question side
@@ -118,7 +126,10 @@ export function StudyCard({
                       {flashcard.question}
                     </p>
                     <p className="text-sm text-muted-foreground mt-6 opacity-70">
-                      Click to reveal answer
+                      {disabled
+                        ? "Controls are being updated..."
+                        : "Click to reveal answer"}{" "}
+                      {/* NEW: Update hint text when disabled */}
                     </p>
                   </>
                 )}
@@ -136,7 +147,7 @@ export function StudyCard({
               <div
                 className={`bg-primary/5 border border-border rounded-lg shadow-lg p-8 h-full flex flex-col justify-center items-center text-center hover:shadow-xl transition-all duration-300 ${
                   feedback ? getFeedbackColors() : ""
-                }`}
+                } ${disabled ? "hover:shadow-lg" : ""}`} // NEW: Disable hover effect when disabled
               >
                 {feedback ? (
                   // Show feedback overlay on answer side
@@ -177,13 +188,16 @@ export function StudyCard({
               // BEFORE showing answer - Show Skip button
               <div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Click the card to see the answer
+                  {disabled
+                    ? "Please wait while controls are being updated..."
+                    : "Click the card to see the answer"}{" "}
+                  {/* NEW: Update text when disabled */}
                 </p>
                 <div className="flex justify-center gap-3">
                   <Button
                     variant="outline"
                     onClick={() => onNext()}
-                    disabled={isTransitioning}
+                    disabled={isTransitioning || disabled} // NEW: Add disabled condition
                     className="bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700 dark:bg-gray-900/20 dark:hover:bg-gray-900/30 dark:border-gray-800 dark:text-gray-300 disabled:opacity-50"
                   >
                     Skip
@@ -194,15 +208,18 @@ export function StudyCard({
               // AFTER showing answer - Show Yes/No buttons
               <div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {isLastCard
+                  {disabled
+                    ? "Please wait while controls are being updated..."
+                    : isLastCard
                     ? "Final card - Did you get it right?"
-                    : "Did you get it right?"}
+                    : "Did you get it right?"}{" "}
+                  {/* NEW: Update text when disabled */}
                 </p>
                 <div className="flex justify-center gap-3">
                   <Button
                     variant="outline"
                     onClick={() => onNext(false)}
-                    disabled={isTransitioning}
+                    disabled={isTransitioning || disabled} // NEW: Add disabled condition
                     className="flex items-center gap-2 bg-red-50 hover:bg-red-100 border-red-200 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:border-red-800 dark:text-red-300 disabled:opacity-50"
                   >
                     <X className="h-4 w-4" />
@@ -211,7 +228,7 @@ export function StudyCard({
                   <Button
                     variant="outline"
                     onClick={() => onNext(true)}
-                    disabled={isTransitioning}
+                    disabled={isTransitioning || disabled} // NEW: Add disabled condition
                     className="flex items-center gap-2 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:border-green-800 dark:text-green-300 disabled:opacity-50"
                   >
                     <Check className="h-4 w-4" />

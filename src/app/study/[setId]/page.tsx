@@ -10,16 +10,7 @@ import {
   StudyNoCardsState,
 } from "@/components/study/StudyErrorStates";
 import { useStudyKeyboard } from "@/components/study/useStudyKeyboard";
-import type { Flashcard, FlashcardSet } from "@/lib/flashcards";
-
-interface StudySession {
-  startTime: Date;
-  endTime?: Date;
-  totalCards: number;
-  studiedCards: number;
-  correctAnswers: number;
-  incorrectAnswers: number;
-}
+import type { Flashcard, FlashcardSet, StudySession, StudyRound } from "@/lib/flashcards";
 
 export default function StudyPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -28,28 +19,26 @@ export default function StudyPage() {
 
   // Core state
   const [set, setSet] = useState<FlashcardSet | null>(null);
-  const [studyCards, setStudyCards] = useState<Flashcard[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Study tracking
-  const [studiedCards, setStudiedCards] = useState<string[]>([]);
-  const [correctAnswers, setCorrectAnswers] = useState<string[]>([]);
-  const [incorrectAnswers, setIncorrectAnswers] = useState<string[]>([]);
-  const [skippedCards, setSkippedCards] = useState<string[]>([]);
-  const [missedCards, setMissedCards] = useState<Flashcard[]>([]);
+  // Round-based study state
   const [studySession, setStudySession] = useState<StudySession | null>(null);
+  const [currentRound, setCurrentRound] = useState<StudyRound | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [feedback, setFeedback] = useState<"correct" | "incorrect" | "skipped" | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // UI state
+  // UI state (keep existing)
   const [shuffled, setShuffled] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [isReviewingMissed, setIsReviewingMissed] = useState(false);
-  const [feedback, setFeedback] = useState<
-    "correct" | "incorrect" | "skipped" | null
-  >(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Loading states for controls
+  const [controlsLoading, setControlsLoading] = useState({
+    shuffle: false,
+    reset: false,
+  });
+  const [controlsError, setControlsError] = useState<string | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -70,16 +59,6 @@ export default function StudyPage() {
         }
         const data = await response.json();
         setSet(data);
-        setStudyCards(data.cards);
-
-        // Initialize study session
-        setStudySession({
-          startTime: new Date(),
-          totalCards: data.cards.length,
-          studiedCards: 0,
-          correctAnswers: 0,
-          incorrectAnswers: 0,
-        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -90,57 +69,228 @@ export default function StudyPage() {
     fetchSet();
   }, [setId, isSignedIn]);
 
+  // Initialize study session when set loads
+  useEffect(() => {
+    if (!set || studySession) return;
+    
+    const initialRound: StudyRound = {
+      roundNumber: 1,
+      roundType: 'initial',
+      startTime: new Date(),
+      cards: [...set.cards],
+      totalCards: set.cards.length,
+      currentIndex: 0,
+      studiedCards: [],
+      correctAnswers: [],
+      incorrectAnswers: [],
+      skippedCards: [],
+      missedCards: [],
+    };
+    
+    const newStudySession: StudySession = {
+      startTime: new Date(),
+      originalSetSize: set.cards.length,
+      setId: set.id,
+      setName: set.name,
+      totalCardsStudied: 0,
+      totalCorrectAnswers: 0,
+      totalIncorrectAnswers: 0,
+      totalSkippedCards: 0,
+      rounds: [initialRound],
+      currentRoundIndex: 0,
+      allMissedCards: [],
+    };
+    
+    setStudySession(newStudySession);
+    setCurrentRound(initialRound);
+  }, [set, studySession]);
+
   // Clear feedback when card changes
   useEffect(() => {
     setFeedback(null);
     setIsTransitioning(false);
-  }, [currentIndex]);
+  }, [currentRound?.currentIndex]);
 
-  // Reset session data
-  const resetSession = useCallback(() => {
-    if (!set) return;
+  // Helper function to set loading state for specific operation
+  const setOperationLoading = useCallback(
+    (operation: keyof typeof controlsLoading, isLoading: boolean) => {
+      setControlsLoading((prev) => ({ ...prev, [operation]: isLoading }));
+    },
+    []
+  );
 
-    setStudiedCards([]);
-    setCorrectAnswers([]);
-    setIncorrectAnswers([]);
-    setSkippedCards([]);
-    setMissedCards([]);
-    setIsReviewingMissed(false);
-    setStudySession({
+  // Helper function to handle operation errors
+  const handleOperationError = useCallback((error: string) => {
+    setControlsError(error);
+    // Auto-clear error after 5 seconds
+    setTimeout(() => setControlsError(null), 5000);
+  }, []);
+
+  // Shuffle current round cards
+  const handleShuffleRound = useCallback(async () => {
+    if (!currentRound || !studySession || controlsLoading.shuffle) return;
+
+    setOperationLoading("shuffle", true);
+    setControlsError(null);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // 🔧 FIX: Only shuffle remaining unstudied cards
+      const studiedCards = currentRound.cards.slice(0, currentRound.currentIndex);
+      const remainingCards = currentRound.cards.slice(currentRound.currentIndex);
+      const shuffledRemainingCards = [...remainingCards].sort(() => Math.random() - 0.5);
+      
+      // Combine studied cards (in order) with shuffled remaining cards
+      const reorderedCards = [...studiedCards, ...shuffledRemainingCards];
+      
+      // 🔧 FIX: Preserve round start time and progress
+      const updatedRound: StudyRound = {
+        ...currentRound,
+        cards: reorderedCards,
+        // Keep currentIndex the same - we're at the same position in our progress
+        // DON'T reset: startTime, studiedCards, correctAnswers, etc.
+        // Only changed: card order for remaining cards
+      };
+
+      setCurrentRound(updatedRound);
+      setShuffled(true);
+      setShowAnswer(false);
+      setFeedback(null);
+      setIsTransitioning(false);
+      
+      // Update the round in the session
+      if (studySession) {
+        const updatedSession = { ...studySession };
+        updatedSession.rounds[studySession.currentRoundIndex] = updatedRound;
+        setStudySession(updatedSession);
+      }
+    } catch (error) {
+      handleOperationError("Failed to shuffle cards. Please try again.");
+      console.error("Shuffle error:", error);
+    } finally {
+      setOperationLoading("shuffle", false);
+    }
+  }, [
+    currentRound,
+    studySession,
+    controlsLoading.shuffle,
+    setOperationLoading,
+    handleOperationError,
+  ]);
+
+  // Reset to original order with loading state (only available when shuffled)
+  const handleResetToOriginal = useCallback(async () => {
+    if (!set || !currentRound || controlsLoading.reset) return;
+
+    setOperationLoading("reset", true);
+    setControlsError(null);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // 🔧 FIX: Only reset remaining unstudied cards to original order
+      const studiedCards = currentRound.cards.slice(0, currentRound.currentIndex);
+      
+      // Get original order for remaining cards based on round type
+      let originalFullCards: Flashcard[];
+      if (currentRound.roundType === 'initial') {
+        originalFullCards = [...set.cards];
+      } else {
+        // For review rounds, we need to find the original order from when the round started
+        // Since we can't easily reconstruct this, we'll use the current cards as the "original"
+        // This is a reasonable fallback for review rounds
+        originalFullCards = [...currentRound.cards];
+      }
+
+      // Find remaining cards in their original order
+      const studiedCardIds = new Set(studiedCards.map(card => card.id));
+      const remainingCardsInOriginalOrder = originalFullCards.filter(
+        card => !studiedCardIds.has(card.id)
+      );
+
+      // Combine studied cards (in current order) with remaining cards in original order
+      const reorderedCards = [...studiedCards, ...remainingCardsInOriginalOrder];
+
+      // 🔧 FIX: Preserve round start time and progress
+      const updatedRound: StudyRound = {
+        ...currentRound,
+        cards: reorderedCards,
+        // Keep currentIndex the same - we're at the same position in our progress
+        // DON'T reset: startTime, studiedCards, correctAnswers, etc.
+        // Only changed: card order for remaining cards back to original
+      };
+
+      setCurrentRound(updatedRound);
+      setShuffled(false);
+      setShowAnswer(false);
+      setFeedback(null);
+      setIsTransitioning(false);
+      
+      // Update the round in the session
+      if (studySession) {
+        const updatedSession = { ...studySession };
+        updatedSession.rounds[studySession.currentRoundIndex] = updatedRound;
+        setStudySession(updatedSession);
+      }
+    } catch (error) {
+      handleOperationError("Failed to reset to original order. Please try again.");
+      console.error("Reset to original error:", error);
+    } finally {
+      setOperationLoading("reset", false);
+    }
+  }, [
+    set,
+    currentRound,
+    controlsLoading.reset,
+    setOperationLoading,
+    handleOperationError,
+  ]);
+
+
+  // Start a new round with specific cards
+  const startNewRound = useCallback((cards: Flashcard[], roundType: 'review' | 'missed' | 'initial') => {
+    if (!studySession) return;
+    
+    const newRoundNumber = studySession.rounds.length + 1;
+    const newRound: StudyRound = {
+      roundNumber: newRoundNumber,
+      roundType,
       startTime: new Date(),
-      totalCards: set.cards.length,
-      studiedCards: 0,
-      correctAnswers: 0,
-      incorrectAnswers: 0,
-    });
-  }, [set]);
-
-  // Shuffle cards
-  const shuffleCards = useCallback(() => {
-    if (!set) return;
-
-    const shuffledCards = [...set.cards].sort(() => Math.random() - 0.5);
-    setStudyCards(shuffledCards);
-    setShuffled(true);
-    setCurrentIndex(0);
+      cards: [...cards],
+      totalCards: cards.length,
+      currentIndex: 0,
+      studiedCards: [],
+      correctAnswers: [],
+      incorrectAnswers: [],
+      skippedCards: [],
+      missedCards: [],
+    };
+    
+    const updatedSession = {
+      ...studySession,
+      rounds: [...studySession.rounds, newRound],
+      currentRoundIndex: newRoundNumber - 1,
+    };
+    
+    setStudySession(updatedSession);
+    setCurrentRound(newRound);
     setShowAnswer(false);
     setFeedback(null);
     setIsTransitioning(false);
-    resetSession();
-  }, [set, resetSession]);
+  }, [studySession]);
 
-  // Reset to original order
-  const resetCards = useCallback(() => {
+  // Start review round with missed cards from current round
+  const startReviewRound = useCallback(() => {
+    if (!currentRound || currentRound.missedCards.length === 0) return;
+    startNewRound(currentRound.missedCards, 'review');
+  }, [currentRound, startNewRound]);
+
+  // Start new round with entire original set
+  const studyEntireSet = useCallback(() => {
     if (!set) return;
-
-    setStudyCards([...set.cards]);
-    setShuffled(false);
-    setCurrentIndex(0);
-    setShowAnswer(false);
-    setFeedback(null);
-    setIsTransitioning(false);
-    resetSession();
-  }, [set, resetSession]);
+    startNewRound(set.cards, 'initial');
+  }, [set, startNewRound]);
 
   // Handle showing answer
   const handleShowAnswer = useCallback(() => {
@@ -149,197 +299,169 @@ export default function StudyPage() {
 
   // Handle previous card - clears any previous answer for that card
   const handlePrevious = useCallback(() => {
-    if (currentIndex > 0) {
-      const prevCardId = studyCards[currentIndex - 1]?.id;
+    if (!currentRound || !studySession || currentRound.currentIndex <= 0) return;
+    
+    const prevCardId = currentRound.cards[currentRound.currentIndex - 1]?.id;
+    if (!prevCardId) return;
 
-      if (prevCardId) {
-        // Remove previous card from all answer arrays to reset it
-        setStudiedCards((prev) => prev.filter((id) => id !== prevCardId));
-        setCorrectAnswers((prev) => prev.filter((id) => id !== prevCardId));
-        setIncorrectAnswers((prev) => prev.filter((id) => id !== prevCardId));
-        setSkippedCards((prev) => prev.filter((id) => id !== prevCardId));
-        setMissedCards((prev) => prev.filter((card) => card.id !== prevCardId));
+    // Update current round - remove previous card answers
+    const updatedRound = { ...currentRound };
+    updatedRound.studiedCards = updatedRound.studiedCards.filter((id) => id !== prevCardId);
+    updatedRound.correctAnswers = updatedRound.correctAnswers.filter((id) => id !== prevCardId);
+    updatedRound.incorrectAnswers = updatedRound.incorrectAnswers.filter((id) => id !== prevCardId);
+    updatedRound.skippedCards = updatedRound.skippedCards.filter((id) => id !== prevCardId);
+    updatedRound.missedCards = updatedRound.missedCards.filter((card) => card.id !== prevCardId);
+    updatedRound.currentIndex = updatedRound.currentIndex - 1;
 
-        // Update session stats
-        setStudySession((prev) =>
-          prev
-            ? {
-                ...prev,
-                studiedCards: Math.max(0, prev.studiedCards - 1),
-                correctAnswers: correctAnswers.includes(prevCardId)
-                  ? Math.max(0, prev.correctAnswers - 1)
-                  : prev.correctAnswers,
-                incorrectAnswers: incorrectAnswers.includes(prevCardId)
-                  ? Math.max(0, prev.incorrectAnswers - 1)
-                  : prev.incorrectAnswers,
-              }
-            : null
-        );
-      }
-
-      setCurrentIndex((prev) => prev - 1);
-      setShowAnswer(false);
-      setFeedback(null);
-      setIsTransitioning(false);
-    }
-  }, [currentIndex, studyCards, correctAnswers, incorrectAnswers]);
-
-  // Handle next card with smart animation
-  const handleNext = useCallback(
-    (gotItRight?: boolean) => {
-      if (!studyCards.length || !studySession || isTransitioning) return;
-
-      const currentCard = studyCards[currentIndex];
-      if (!currentCard || studiedCards.includes(currentCard.id)) return;
-
-      // Determine if we should show animation
-      // Show animation for:
-      // 1. When answer is visible and user makes a choice (Yes/No)
-      // 2. When skipping (right arrow or skip button) regardless of answer visibility
-      const shouldShowAnimation =
-        (showAnswer && (gotItRight === true || gotItRight === false)) || // Yes/No with answer shown
-        gotItRight === undefined; // Skip action (right arrow or skip button)
-
-      // Set feedback based on choice
-      let feedbackType: "correct" | "incorrect" | "skipped" | null = null;
-      if (gotItRight === true) feedbackType = "correct";
-      else if (gotItRight === false) feedbackType = "incorrect";
-      else feedbackType = "skipped";
-
-      // Update tracking arrays
-      setStudiedCards((prev) => [...prev, currentCard.id]);
-
-      if (gotItRight === true) {
-        setCorrectAnswers((prev) => [...prev, currentCard.id]);
-      } else if (gotItRight === false) {
-        setIncorrectAnswers((prev) => [...prev, currentCard.id]);
-        setMissedCards((prev) => [...prev, currentCard]);
-      } else {
-        setSkippedCards((prev) => [...prev, currentCard.id]);
-      }
-
-      // Update session stats
-      setStudySession((prev) =>
-        prev
-          ? {
-              ...prev,
-              studiedCards: prev.studiedCards + 1,
-              correctAnswers:
-                gotItRight === true
-                  ? prev.correctAnswers + 1
-                  : prev.correctAnswers,
-              incorrectAnswers:
-                gotItRight === false
-                  ? prev.incorrectAnswers + 1
-                  : prev.incorrectAnswers,
-            }
-          : null
-      );
-
-      if (shouldShowAnimation) {
-        // Show animation then advance
-        setFeedback(feedbackType);
-        setIsTransitioning(true);
-
-        setTimeout(() => {
-          // Move to next card or complete
-          if (currentIndex < studyCards.length - 1) {
-            setCurrentIndex((prev) => prev + 1);
-            setShowAnswer(false);
-          } else {
-            setStudySession((prev) =>
-              prev ? { ...prev, endTime: new Date() } : null
-            );
-          }
-          setFeedback(null);
-          setIsTransitioning(false);
-        }, 800);
-      } else {
-        // This case should rarely happen now, but keeping for safety
-        if (currentIndex < studyCards.length - 1) {
-          setCurrentIndex((prev) => prev + 1);
-          setShowAnswer(false);
-        } else {
-          setStudySession((prev) =>
-            prev ? { ...prev, endTime: new Date() } : null
+    // Update session cumulative stats
+    const updatedSession = { ...studySession };
+    if (currentRound.studiedCards.includes(prevCardId)) {
+      // Check what type of answer this was
+      const wasCorrect = currentRound.correctAnswers.includes(prevCardId);
+      const wasIncorrect = currentRound.incorrectAnswers.includes(prevCardId);
+      const wasSkipped = currentRound.skippedCards.includes(prevCardId);
+      
+      if (wasCorrect) {
+        updatedSession.totalCorrectAnswers = Math.max(0, updatedSession.totalCorrectAnswers - 1);
+        // 🔧 FIX: Only decrement totalCardsStudied for actual answers (not skips)
+        updatedSession.totalCardsStudied = Math.max(0, updatedSession.totalCardsStudied - 1);
+        
+        // 🔧 FIX: If going back on a correct answer, we need to potentially re-add to missed cards
+        // if this card was missed in any previous round
+        const prevCard = currentRound.cards.find(card => card.id === prevCardId);
+        if (prevCard) {
+          // Check if this card was missed in earlier rounds by looking at all previous rounds
+          const wasMissedInPreviousRounds = studySession.rounds.some((round, index) => 
+            index < studySession.currentRoundIndex && 
+            round.incorrectAnswers.includes(prevCardId)
           );
+          if (wasMissedInPreviousRounds && !updatedSession.allMissedCards.find(card => card.id === prevCardId)) {
+            updatedSession.allMissedCards = [...updatedSession.allMissedCards, prevCard];
+          }
         }
       }
-    },
-    [
-      studyCards,
-      studySession,
-      currentIndex,
-      studiedCards,
-      showAnswer,
-      isTransitioning,
-    ]
-  );
-
-  // Restart study session
-  const handleRestart = useCallback(() => {
-    if (!set) return;
-
-    setStudyCards([...set.cards]);
-    setShuffled(false);
-    setCurrentIndex(0);
-    setShowAnswer(false);
-    setFeedback(null);
-    setIsTransitioning(false);
-    resetSession();
-  }, [set, resetSession]);
-
-  // Start reviewing missed/skipped cards
-  const startReviewSession = useCallback(() => {
-    const cardsToReview = [...missedCards];
-
-    // Add skipped cards to review
-    const skippedCardObjects =
-      set?.cards.filter((card) => skippedCards.includes(card.id)) || [];
-    skippedCardObjects.forEach((card) => {
-      if (!cardsToReview.find((c) => c.id === card.id)) {
-        cardsToReview.push(card);
+      if (wasIncorrect) {
+        updatedSession.totalIncorrectAnswers = Math.max(0, updatedSession.totalIncorrectAnswers - 1);
+        // 🔧 FIX: Only decrement totalCardsStudied for actual answers (not skips)
+        updatedSession.totalCardsStudied = Math.max(0, updatedSession.totalCardsStudied - 1);
       }
-    });
+      if (wasSkipped) {
+        updatedSession.totalSkippedCards = Math.max(0, updatedSession.totalSkippedCards - 1);
+        // 🔧 FIX: Skipped cards don't count as "studied", so don't decrement totalCardsStudied
+      }
+    }
 
-    if (cardsToReview.length === 0) return;
+    // Update session rounds array
+    updatedSession.rounds[updatedSession.currentRoundIndex] = updatedRound;
 
-    setStudyCards(cardsToReview);
-    setIsReviewingMissed(true);
-    setCurrentIndex(0);
+    setCurrentRound(updatedRound);
+    setStudySession(updatedSession);
     setShowAnswer(false);
     setFeedback(null);
     setIsTransitioning(false);
-    setStudiedCards([]);
-    setCorrectAnswers([]);
-    setIncorrectAnswers([]);
-    setSkippedCards([]);
-    setMissedCards([]);
+  }, [currentRound, studySession]);
 
-    // Start new session for review cards
-    setStudySession({
-      startTime: new Date(),
-      totalCards: cardsToReview.length,
-      studiedCards: 0,
-      correctAnswers: 0,
-      incorrectAnswers: 0,
-    });
-  }, [missedCards, skippedCards, set]);
+  // Handle next card with smart animation
+  const handleNext = useCallback((gotItRight?: boolean) => {
+    if (!currentRound || !studySession || isTransitioning) return;
+
+    const currentCard = currentRound.cards[currentRound.currentIndex];
+    if (!currentCard || currentRound.studiedCards.includes(currentCard.id)) return;
+
+    // Update current round stats
+    const updatedRound = { ...currentRound };
+    updatedRound.studiedCards = [...updatedRound.studiedCards, currentCard.id];
+    
+    // Update session cumulative stats
+    const updatedSession = { ...studySession };
+    
+    if (gotItRight === true) {
+      updatedRound.correctAnswers = [...updatedRound.correctAnswers, currentCard.id];
+      updatedSession.totalCorrectAnswers += 1;
+      // 🔧 FIX: Only count actual answers as "studied"
+      updatedSession.totalCardsStudied += 1;
+      
+      // 🔧 FIX 1: Remove from all missed cards lists when answered correctly
+      updatedSession.allMissedCards = updatedSession.allMissedCards.filter(
+        card => card.id !== currentCard.id
+      );
+      // Also remove from current round's missed cards if it was there
+      updatedRound.missedCards = updatedRound.missedCards.filter(
+        card => card.id !== currentCard.id
+      );
+      
+    } else if (gotItRight === false) {
+      updatedRound.incorrectAnswers = [...updatedRound.incorrectAnswers, currentCard.id];
+      updatedRound.missedCards = [...updatedRound.missedCards, currentCard];
+      updatedSession.totalIncorrectAnswers += 1;
+      // 🔧 FIX: Only count actual answers as "studied"
+      updatedSession.totalCardsStudied += 1;
+      
+      // Add to overall missed cards if not already there
+      if (!updatedSession.allMissedCards.find(card => card.id === currentCard.id)) {
+        updatedSession.allMissedCards = [...updatedSession.allMissedCards, currentCard];
+      }
+    } else {
+      // Skipped card logic
+      updatedRound.skippedCards = [...updatedRound.skippedCards, currentCard.id];
+      updatedSession.totalSkippedCards += 1;
+      // 🔧 FIX: Skipped cards DON'T count as "studied"
+      // Remove this line: updatedSession.totalCardsStudied += 1;
+      
+      // 🔧 NEW: Add skipped cards to missed cards for review
+      updatedRound.missedCards = [...updatedRound.missedCards, currentCard];
+      if (!updatedSession.allMissedCards.find(card => card.id === currentCard.id)) {
+        updatedSession.allMissedCards = [...updatedSession.allMissedCards, currentCard];
+      }
+    }
+    
+    // Set feedback and show animation
+    setFeedback(gotItRight === true ? "correct" : gotItRight === false ? "incorrect" : "skipped");
+    setIsTransitioning(true);
+    
+    setTimeout(() => {
+      if (updatedRound.currentIndex < updatedRound.cards.length - 1) {
+        // 🔧 FIX 2: Update session FIRST, then advance currentIndex
+        updatedRound.currentIndex += 1;
+        setCurrentRound(updatedRound);
+        setStudySession(updatedSession); // Update session with cleaned missed cards
+        setShowAnswer(false);
+      } else {
+        // Round complete
+        updatedRound.endTime = new Date();
+        updatedSession.rounds[updatedSession.currentRoundIndex] = updatedRound;
+        setStudySession(updatedSession);
+        setCurrentRound(updatedRound);
+      }
+      setFeedback(null);
+      setIsTransitioning(false);
+    }, 800);
+  }, [currentRound, studySession, isTransitioning]);
+
+  // Start reviewing all missed cards from entire session
+  const startMissedCardsRound = useCallback(() => {
+    if (!studySession || studySession.allMissedCards.length === 0) return;
+    startNewRound(studySession.allMissedCards, 'missed');
+  }, [studySession, startNewRound]);
 
   // Toggle keyboard help
   const toggleKeyboardHelp = useCallback(() => {
     setShowKeyboardHelp((prev) => !prev);
   }, []);
 
+  // NEW: Clear controls error
+  const clearControlsError = useCallback(() => {
+    setControlsError(null);
+  }, []);
+
   // Set up keyboard shortcuts
   useStudyKeyboard({
     showAnswer,
-    currentIndex,
+    currentIndex: currentRound?.currentIndex ?? 0,
     onShowAnswer: handleShowAnswer,
     onNext: handleNext,
     onPrevious: handlePrevious,
-    onShuffle: shuffleCards,
-    onRestart: handleRestart,
+    onShuffle: handleShuffleRound,
     onToggleHelp: toggleKeyboardHelp,
   });
 
@@ -354,27 +476,22 @@ export default function StudyPage() {
   }
 
   // No cards state
-  if (!set || !studyCards.length) {
+  if (!set || !currentRound?.cards.length) {
     return <StudyNoCardsState />;
   }
 
-  const isComplete = studiedCards.length === studyCards.length;
+  const isComplete = currentRound && currentRound.studiedCards.length === currentRound.cards.length;
 
   // Completion state
-  if (isComplete && studySession) {
+  if (isComplete && studySession && currentRound) {
     return (
       <StudyComplete
-        setId={setId}
-        setName={set.name}
-        studyCards={studyCards}
-        correctAnswers={correctAnswers}
-        incorrectAnswers={incorrectAnswers}
-        skippedCards={skippedCards}
-        missedCards={missedCards}
         studySession={studySession}
-        isReviewingMissed={isReviewingMissed}
-        onRestart={handleRestart}
-        onStartReviewSession={startReviewSession}
+        currentRound={currentRound}
+        onStudyEntireSet={studyEntireSet}
+        onStartReviewRound={startReviewRound}
+        onStartMissedCardsRound={startMissedCardsRound}
+        onFinishSession={() => window.history.back()}
       />
     );
   }
@@ -382,25 +499,33 @@ export default function StudyPage() {
   // Main study interface
   return (
     <StudyInterface
-      setId={setId}
-      setName={set.name}
-      studyCards={studyCards}
-      currentIndex={currentIndex}
-      showAnswer={showAnswer}
-      shuffled={shuffled}
-      showKeyboardHelp={showKeyboardHelp}
-      isReviewingMissed={isReviewingMissed}
+      // Session and round data
       studySession={studySession}
-      studiedCards={studiedCards}
+      currentRound={currentRound}
+      
+      // Current card state
+      showAnswer={showAnswer}
       feedback={feedback}
       isTransitioning={isTransitioning}
+      
+      // Actions
       onShowAnswer={handleShowAnswer}
       onNext={handleNext}
       onPrevious={handlePrevious}
-      onShuffle={shuffleCards}
-      onReset={resetCards}
-      onRestart={handleRestart}
+      
+      // Round management
+      onShuffleRound={handleShuffleRound}
+      onResetToOriginal={handleResetToOriginal}
+      
+      // UI state
+      shuffled={shuffled}
+      showKeyboardHelp={showKeyboardHelp}
       onToggleKeyboardHelp={toggleKeyboardHelp}
+      
+      // Loading and errors
+      controlsLoading={controlsLoading}
+      controlsError={controlsError}
+      onClearControlsError={clearControlsError}
     />
   );
 }

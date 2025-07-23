@@ -7,7 +7,6 @@ interface UseStudyKeyboardProps {
   onNext: (gotItRight?: boolean) => void;
   onPrevious: () => void;
   onShuffle: () => void;
-  onRestart: () => void;
   onToggleHelp: () => void;
 }
 
@@ -18,7 +17,6 @@ export function useStudyKeyboard({
   onNext,
   onPrevious,
   onShuffle,
-  onRestart,
   onToggleHelp,
 }: UseStudyKeyboardProps) {
   const handleKeyPress = useCallback(
@@ -65,10 +63,6 @@ export function useStudyKeyboard({
           event.preventDefault();
           onShuffle();
           break;
-        case "KeyR":
-          event.preventDefault();
-          onRestart();
-          break;
         case "KeyH":
         case "F1":
           event.preventDefault();
@@ -83,7 +77,6 @@ export function useStudyKeyboard({
       onNext,
       onPrevious,
       onShuffle,
-      onRestart,
       onToggleHelp,
     ]
   );
