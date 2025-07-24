@@ -1,25 +1,27 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton"; // ✅ ADD
+import { Trophy, Clock, Target, RotateCcw, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { StudySession, StudyRound } from "@/lib/flashcards";
 
 interface StudyCompleteProps {
   studySession: StudySession;
   currentRound: StudyRound;
-  onStudyEntireSet: () => void;      // Study all original cards again
-  onStartReviewRound: () => void;    // Review missed cards from current round
-  onStartMissedCardsRound: () => void; // Review all missed cards from session
-  onFinishSession: () => void;       // Exit study mode
+  onStudyEntireSet: () => void;
+  onStartReviewRound: () => void;
+  onStartMissedCardsRound: () => void;
+  onFinishSession: () => void;
 }
 
-export function StudyComplete({
+export const StudyComplete = memo(function StudyComplete({
   studySession,
   currentRound,
   onStudyEntireSet,
   onStartReviewRound,
   onStartMissedCardsRound,
-  onFinishSession,
 }: StudyCompleteProps) {
   // Current round stats
   const correctCount = currentRound.correctAnswers.length;
@@ -33,148 +35,263 @@ export function StudyComplete({
   // Round duration
   const roundDuration = currentRound.endTime
     ? Math.round(
-        (currentRound.endTime.getTime() - currentRound.startTime.getTime()) / 1000
+        (currentRound.endTime.getTime() - currentRound.startTime.getTime()) /
+          1000
       )
     : 0;
 
-  // Session duration (total time studying)
+  // Session duration
   const sessionDuration = Math.round(
     (Date.now() - studySession.startTime.getTime()) / 1000
   );
 
   // Session totals
-  const sessionCorrectPercentage = studySession.totalCardsStudied > 0
-    ? Math.round((studySession.totalCorrectAnswers / studySession.totalCardsStudied) * 100)
-    : 0;
+  const sessionCorrectPercentage =
+    studySession.totalCardsStudied > 0
+      ? Math.round(
+          (studySession.totalCorrectAnswers / studySession.totalCardsStudied) *
+            100
+        )
+      : 0;
+
+  // Logic for different scenarios
+  const hasCurrentRoundMissedCards = currentRound.missedCards.length > 0;
+  const hasSessionMissedCards = studySession.allMissedCards.length > 0;
+  const hasDifferentMissedCounts =
+    hasSessionMissedCards &&
+    studySession.allMissedCards.length !== currentRound.missedCards.length;
+  const hasCompletedMultipleRounds = studySession.rounds.length > 1;
+  const isPerfectRound = correctCount === currentRound.totalCards;
+
+  // Format time helper
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-center max-w-lg mx-auto p-6">
-        <div className="text-center space-y-2 mb-6">
-          <h1 className="text-2xl font-bold text-foreground">
-            Round {currentRound.roundNumber} Complete!
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            {isPerfectRound ? (
+              <Trophy className="h-16 w-16 text-yellow-500" />
+            ) : (
+              <Target className="h-16 w-16 text-primary" />
+            )}
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {isPerfectRound ? "Perfect Round!" : "Round Complete!"}
           </h1>
-          <div className="text-muted-foreground">
-            <p>
-              {currentRound.correctAnswers.length} correct, {' '}
-              {currentRound.incorrectAnswers.length} incorrect, {' '}
-              {currentRound.skippedCards.length} skipped
-            </p>
-            {currentRound.missedCards.length > 0 && (
-              <p className="text-amber-600 dark:text-amber-400 font-medium">
-                {currentRound.missedCards.length} cards available for review
-                <span className="text-xs text-muted-foreground block mt-1">
-                  (includes incorrect and skipped cards)
-                </span>
-              </p>
-            )}
-          </div>
+          <p className="text-lg text-muted-foreground">
+            Round {currentRound.roundNumber} •{" "}
+            {currentRound.roundType.charAt(0).toUpperCase() +
+              currentRound.roundType.slice(1)}
+          </p>
         </div>
 
-        {/* Round Results */}
-        <div className="bg-card border border-border rounded-lg p-4 mb-4">
-          <h3 className="font-semibold text-foreground mb-3">This Round</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-green-600 dark:text-green-400">✓ Correct:</span>
-              <span className="font-medium">{correctCount}</span>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* Round Results */}
+          <div className="bg-card border border-border rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">
+                This Round
+              </h3>
             </div>
-            <div className="flex justify-between">
-              <span className="text-red-600 dark:text-red-400">✗ Incorrect:</span>
-              <span className="font-medium">{incorrectCount}</span>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  Correct
+                </span>
+                <span className="font-semibold text-lg">{correctCount}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  Incorrect
+                </span>
+                <span className="font-semibold text-lg">{incorrectCount}</span>
+              </div>
+
+              {skippedCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                    <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                    Skipped
+                  </span>
+                  <span className="font-semibold text-lg">{skippedCount}</span>
+                </div>
+              )}
+
+              <div className="border-t border-border pt-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Time
+                  </span>
+                  <span className="font-semibold">
+                    {formatTime(roundDuration)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Score</span>
+                  <span
+                    className={`font-bold text-xl ${
+                      roundPercentage >= 90
+                        ? "text-green-600 dark:text-green-400"
+                        : roundPercentage >= 70
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {roundPercentage}%
+                  </span>
+                </div>
+              </div>
             </div>
-            {skippedCount > 0 && (
+          </div>
+
+          {/* Session Summary */}
+          <div className="bg-muted/50 border border-border rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Trophy className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">
+                Session Summary
+              </h3>
+            </div>
+
+            <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">— Skipped:</span>
-                <span className="font-medium">{skippedCount}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">⏱ Round Time:</span>
-              <span className="font-medium">
-                {Math.floor(roundDuration / 60)}:{(roundDuration % 60).toString().padStart(2, "0")}
-              </span>
-            </div>
-            <div className="border-t border-border pt-2 mt-2">
-              <div className="flex justify-between font-semibold">
-                <span>Round Score:</span>
-                <span className={roundPercentage >= 70 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                  {roundPercentage}%
+                <span>Rounds Completed</span>
+                <span className="font-semibold">
+                  {studySession.rounds.length}
                 </span>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Session Summary */}
-        <div className="bg-muted border border-border rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-foreground mb-3">Study Session Summary</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Rounds Completed:</span>
-              <span className="font-medium">{studySession.rounds.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Cards Studied:</span>
-              <span className="font-medium">{studySession.totalCardsStudied}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Overall Accuracy:</span>
-              <span className="font-medium">{sessionCorrectPercentage}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Time:</span>
-              <span className="font-medium">
-                {Math.floor(sessionDuration / 60)}:{(sessionDuration % 60).toString().padStart(2, "0")}
-              </span>
-            </div>
-            {studySession.allMissedCards.length > 0 && (
-              <div className="flex justify-between text-red-600 dark:text-red-400">
-                <span>Cards Still Need Work:</span>
-                <span className="font-medium">{studySession.allMissedCards.length}</span>
+              <div className="flex justify-between">
+                <span>Total Cards Studied</span>
+                <span className="font-semibold">
+                  {studySession.totalCardsStudied}
+                </span>
               </div>
-            )}
+
+              <div className="flex justify-between">
+                <span>Overall Accuracy</span>
+                <span
+                  className={`font-semibold ${
+                    sessionCorrectPercentage >= 80
+                      ? "text-green-600 dark:text-green-400"
+                      : sessionCorrectPercentage >= 60
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {sessionCorrectPercentage}%
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span>Total Study Time</span>
+                <span className="font-semibold">
+                  {formatTime(sessionDuration)}
+                </span>
+              </div>
+
+              {hasSessionMissedCards && (
+                <div className="border-t border-border pt-3 mt-4">
+                  <div className="flex justify-between">
+                    <span className="text-amber-600 dark:text-amber-400">
+                      Cards Need Review
+                    </span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {studySession.allMissedCards.length}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          {/* Review missed cards from this round */}
-          {currentRound.missedCards.length > 0 && (
-            <Button onClick={onStartReviewRound} variant="outline" className="w-full">
-              Review {currentRound.missedCards.length} Missed & Skipped Cards from This Round
-            </Button>
-          )}
-          
-          {/* Review all missed cards from entire session - only if different from current round */}
-          {studySession.allMissedCards.length > 0 && studySession.allMissedCards.length !== currentRound.missedCards.length && (
-            <Button onClick={onStartMissedCardsRound} variant="outline" className="w-full">
-              Review All {studySession.allMissedCards.length} Missed & Skipped Cards
-            </Button>
-          )}
-          
-          {/* Show celebration message when no missed cards remain */}
-          {studySession.allMissedCards.length === 0 && currentRound.missedCards.length === 0 && studySession.rounds.length > 1 && (
-            <div className="text-center text-sm text-green-600 dark:text-green-400 py-2">
-              🎉 Excellent! You&apos;ve mastered all previously missed cards.
+        {/* Celebration Message */}
+        {isPerfectRound && (
+          <div className="text-center mb-6 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <p className="text-green-700 dark:text-green-300 font-medium">
+              🎉 Fantastic! You got every card right in this round!
+            </p>
+          </div>
+        )}
+
+        {!hasSessionMissedCards &&
+          !hasCurrentRoundMissedCards &&
+          hasCompletedMultipleRounds && (
+            <div className="text-center mb-6 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-green-700 dark:text-green-300 font-medium">
+                🏆 Excellent! You&apos;ve mastered all the cards from this set!
+              </p>
             </div>
           )}
-          
-          {/* Study entire set again */}
-          <Button onClick={onStudyEntireSet} className="w-full">
-            Study Entire Set Again
-          </Button>
-          
-          {/* Navigation */}
-          <Link href={`/sets/${studySession.setId}`}>
-            <Button variant="outline" className="w-full">
-              View Set Details
+
+        {/* Action Buttons */}
+        <div className="max-w-md mx-auto space-y-3">
+          {/* Review Options */}
+          {hasCurrentRoundMissedCards && (
+            <LoadingButton
+              onClick={onStartReviewRound}
+              variant="outline"
+              className="w-full h-12 text-left flex items-center justify-between"
+            >
+              <span>
+                Review {currentRound.missedCards.length} cards from this round
+              </span>
+              <RotateCcw className="h-4 w-4" />
+            </LoadingButton>
+          )}
+
+          {hasDifferentMissedCounts && (
+            <LoadingButton
+              onClick={onStartMissedCardsRound}
+              variant="outline"
+              className="w-full h-12 text-left flex items-center justify-between"
+            >
+              <span>
+                Review all {studySession.allMissedCards.length} missed cards
+              </span>
+              <RotateCcw className="h-4 w-4" />
+            </LoadingButton>
+          )}
+
+          {/* Study Again */}
+          <LoadingButton
+            onClick={onStudyEntireSet}
+            className="w-full h-12 text-left flex items-center justify-between"
+          >
+            <span>Study entire set again</span>
+            <Target className="h-4 w-4" />
+          </LoadingButton>
+
+          {/* Back to Set */}
+          <Link href={`/sets/${studySession.setId}`} className="block">
+            <Button
+              variant="ghost"
+              className="w-full h-12 text-left flex items-center justify-between"
+            >
+              <span>Back to set details</span>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <Button onClick={onFinishSession} variant="ghost" className="w-full">
-            Finish & Go Back
-          </Button>
         </div>
       </div>
     </div>
   );
-}
+});
