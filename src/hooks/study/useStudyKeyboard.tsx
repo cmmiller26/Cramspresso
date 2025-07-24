@@ -3,6 +3,7 @@ import { useEffect, useCallback } from "react";
 interface UseStudyKeyboardProps {
   showAnswer: boolean;
   currentIndex: number;
+  isLoading?: boolean; // ✅ ADD: Disable during loading
   onShowAnswer: () => void;
   onNext: (gotItRight?: boolean) => void;
   onPrevious: () => void;
@@ -13,6 +14,7 @@ interface UseStudyKeyboardProps {
 export function useStudyKeyboard({
   showAnswer,
   currentIndex,
+  isLoading = false, // ✅ NEW
   onShowAnswer,
   onNext,
   onPrevious,
@@ -21,6 +23,9 @@ export function useStudyKeyboard({
 }: UseStudyKeyboardProps) {
   const handleKeyPress = useCallback(
     (event: KeyboardEvent) => {
+      // ✅ IMPROVED: Don't handle keys during loading
+      if (isLoading) return;
+
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
@@ -30,6 +35,7 @@ export function useStudyKeyboard({
 
       switch (event.code) {
         case "Space":
+        case "Enter": // ✅ ADD: Enter key as alternative
           event.preventDefault();
           if (!showAnswer) {
             onShowAnswer();
@@ -65,14 +71,21 @@ export function useStudyKeyboard({
           break;
         case "KeyH":
         case "F1":
+        case "Slash": // ✅ ADD: ? key for help
           event.preventDefault();
           onToggleHelp();
+          break;
+        // ✅ ADD: Escape to close help
+        case "Escape":
+          event.preventDefault();
+          onToggleHelp(); // This will close help if open
           break;
       }
     },
     [
       showAnswer,
       currentIndex,
+      isLoading, // ✅ ADD to dependencies
       onShowAnswer,
       onNext,
       onPrevious,
