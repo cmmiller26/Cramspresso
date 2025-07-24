@@ -1,8 +1,9 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { Shuffle, RotateCcw, ChevronLeft, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { LoadingButton } from "@/components/shared/LoadingButton"; // ✅ ADD
+import { Shuffle, RotateCcw, ChevronLeft } from "lucide-react";
 
 interface StudyControlsProps {
   shuffled: boolean;
@@ -20,7 +21,8 @@ interface StudyControlsProps {
   disabled?: boolean;
 }
 
-export function StudyControls({
+// ✅ PERFORMANCE: Wrapped in React.memo to prevent unnecessary re-renders
+export const StudyControls = memo(function StudyControls({
   shuffled,
   onShuffle,
   onResetToOriginal,
@@ -40,39 +42,34 @@ export function StudyControls({
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-card border border-border rounded-lg">
         {/* Left: Session Controls */}
         <div className="flex items-center gap-2">
-          <Button
+          {/* ✅ IMPROVED: Use LoadingButton for shuffle */}
+          <LoadingButton
             onClick={onShuffle}
             disabled={isDisabled}
+            loading={isLoading.shuffle}
+            loadingText="Shuffling..."
             variant="outline"
             size="sm"
             className="flex items-center gap-2"
           >
-            {isLoading.shuffle ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Shuffle className="h-4 w-4" />
-            )}
-            {isLoading.shuffle ? "Shuffling..." : "Shuffle Cards"}
-          </Button>
+            <Shuffle className="h-4 w-4" />
+            Shuffle Cards
+          </LoadingButton>
 
+          {/* ✅ IMPROVED: Use LoadingButton for reset */}
           {shuffled && (
-            <Button
+            <LoadingButton
               onClick={onResetToOriginal}
               disabled={isDisabled}
+              loading={isLoading.reset}
+              loadingText="Resetting..."
               variant="ghost"
               size="sm"
-              className={cn(
-                "flex items-center gap-2 text-destructive hover:text-destructive",
-                isDisabled && "opacity-50"
-              )}
+              className="flex items-center gap-2 text-destructive hover:text-destructive"
             >
-              {isLoading.reset ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RotateCcw className="h-4 w-4" />
-              )}
-              {isLoading.reset ? "Resetting..." : "Reset to Original"}
-            </Button>
+              <RotateCcw className="h-4 w-4" />
+              Reset to Original
+            </LoadingButton>
           )}
         </div>
 
@@ -101,18 +98,18 @@ export function StudyControls({
         </div>
       </div>
 
-      {/* Loading State Indicator */}
+      {/* ✅ IMPROVED: Better loading indicator */}
       {anyLoading && (
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-full text-sm text-muted-foreground border border-border">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
             <span>
               {isLoading.shuffle && "Shuffling cards..."}
-              {isLoading.reset && "Resetting progress..."}
+              {isLoading.reset && "Resetting to original order..."}
             </span>
           </div>
         </div>
       )}
     </div>
   );
-}
+});
