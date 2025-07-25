@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { useStudyState } from "@/hooks/study";
+import { useStudyState } from "@/hooks/study/useStudyState";
 import { StudyInterface } from "@/components/study/StudyInterface";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import {

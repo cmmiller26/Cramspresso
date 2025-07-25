@@ -1,136 +1,138 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { FileUploader } from "@/components/create/FileUploader";
-import { FilePreview } from "@/components/create/FilePreview";
-import {
-  GenerationSettings,
-  GenerationConfig,
-} from "@/components/create/GenerationSettings";
-import { UploadProgress, UploadStep } from "@/components/create/UploadProgress";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Upload, FileText, Brain, ArrowLeft, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-
-type FlowStep = "upload" | "preview" | "settings" | "generating" | "complete";
-
-interface UploadState {
-  step: FlowStep;
-  uploadStep?: UploadStep;
-  uploadProgress: number;
-  fileName?: string;
-  fileUrl?: string;
-  extractedText: string;
-  source: "file" | "text";
-  isExtracting: boolean;
-  isGenerating: boolean;
-  error?: string;
-  generatedCards?: { question: string; answer: string }[];
+interface GenerationStage {
+  id: string;
+  label: string;
+  description: string;
+  duration: number; // milliseconds
+  endProgress: number; // 0-100
 }
 
-export default function CreatePage() {
-  const router = useRouter();
-  const [state, setState] = useState<UploadState>({
-    step: "upload",
-    uploadProgress: 0,
-    extractedText: "",
-    source: "file",
-    isExtracting: false,
+const GENERATION_STAGES: GenerationStage[] = [
+  {
+    id: "analyzing",
+    label: "Analyzing Content",
+    description: "Reading and understanding your material structure",
+    duration: 2000,
+    endProgress: 20,
+  },
+  {
+    id: "extracting",
+    label: "Extracting Key Concepts",
+    description: "Identifying important terms, definitions, and relationships",
+    duration: 3000,
+    endProgress: 45,
+  },
+  {
+    id: "generating",
+    label: "Generating Questions",
+    description: "Creating targeted questions based on your content",
+    duration: 4000,
+    endProgress: 75,
+  },
+  {
+    id: "formatting",
+    label: "Formatting Cards",
+    description: "Finalizing flashcards and preparing for review",
+    duration: 1500,
+    endProgress: 95,
+  },
+  {
+    id: "complete",
+    label: "Complete",
+    description: "Your flashcards are ready!",
+    duration: 500,
+    endProgress: 100,
+  },
+];
+
+interface GenerationState {
+  isGenerating: boolean;
+  currentStage: number; // index in GENERATION_STAGES
+  progress: number; // 0-100
+  error?: string;
+  canCancel: boolean;
+  estimatedCards: number;
+  wordsProcessed: number;
+  totalWords: number;
+}
+
+// Enhanced generation progress hook
+export function useGenerationProgress() {
+  const [state, setState] = useState<GenerationState>({
     isGenerating: false,
+    currentStage: 0,
+    progress: 0,
+    error: undefined,
+    canCancel: true,
+    estimatedCards: 0,
+    wordsProcessed: 0,
+    totalWords: 0,
   });
 
-  // Handle file upload completion
-  const handleFileUploaded = async (url: string, fileName: string) => {
-    setState((prev) => ({
-      ...prev,
-      step: "preview",
-      fileName,
-      fileUrl: url,
-      source: "file",
-      isExtracting: true,
-      error: undefined,
-    }));
+  const startGeneration = useCallback(
+    (text: string, config: GenerationConfig) => {
+      const words = text.split(/\s+/).filter((word) => word.length > 0);
+      const estimatedCards = Math.max(1, Math.floor(words.length / 50));
 
-    try {
-      // Extract text from uploaded file
-      const response = await fetch("/api/flashcards/extract-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+      setState({
+        isGenerating: true,
+        currentStage: 0,
+        progress: 0,
+        error: undefined,
+        canCancel: true,
+        estimatedCards,
+        wordsProcessed: 0,
+        totalWords: words.length,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to extract text from file");
+      return runGenerationStages(text, config, estimatedCards, words.length);
+    },
+    []
+  );
+
+  const cancelGeneration = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      isGenerating: false,
+      canCancel: false,
+      error: "Generation cancelled by user",
+    }));
+  }, []);
+
+  const runGenerationStages = async (
+    text: string,
+    config: GenerationConfig,
+    estimatedCards: number,
+    totalWords: number
+  ) => {
+    try {
+      // Run through each stage with realistic progress
+      for (
+        let stageIndex = 0;
+        stageIndex < GENERATION_STAGES.length - 1;
+        stageIndex++
+      ) {
+        const stage = GENERATION_STAGES[stageIndex];
+        const nextStage = GENERATION_STAGES[stageIndex + 1];
+
+        // Update current stage
+        setState((prev) => ({ ...prev, currentStage: stageIndex }));
+
+        // Animate progress within the stage
+        await animateProgress(
+          stage.endProgress,
+          nextStage.endProgress,
+          stage.duration,
+          totalWords,
+          stageIndex
+        );
       }
 
-      const { text } = await response.json();
-
-      setState((prev) => ({
-        ...prev,
-        extractedText: text,
-        isExtracting: false,
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error:
-          error instanceof Error ? error.message : "Failed to extract text",
-        isExtracting: false,
-      }));
-    }
-  };
-
-  // Handle direct text input
-  const handleTextInput = (text: string) => {
-    setState((prev) => ({
-      ...prev,
-      step: "preview",
-      extractedText: text,
-      source: "text",
-      fileName: undefined,
-      fileUrl: undefined,
-    }));
-  };
-
-  // Handle flashcard generation
-  const handleGenerate = async (config: GenerationConfig) => {
-    console.log("Generation config:", config); // Log config for future API enhancement
-
-    setState((prev) => ({
-      ...prev,
-      step: "generating",
-      isGenerating: true,
-      uploadStep: "generating",
-      uploadProgress: 0,
-      error: undefined,
-    }));
-
-    try {
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setState((prev) => ({
-          ...prev,
-          uploadProgress: Math.min(prev.uploadProgress + 10, 90),
-        }));
-      }, 500);
-
-      // Note: In the future, we can pass config to the API to customize generation
-      // For now, we use the existing API that generates based on text only
+      // Make the actual API call
       const response = await fetch("/api/flashcards/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: state.extractedText }),
+        body: JSON.stringify({ text }),
       });
-
-      clearInterval(progressInterval);
 
       if (!response.ok) {
         throw new Error("Failed to generate flashcards");
@@ -138,285 +140,206 @@ export default function CreatePage() {
 
       const { cards } = await response.json();
 
+      // Final completion stage
       setState((prev) => ({
         ...prev,
-        step: "complete",
-        uploadStep: "complete",
-        uploadProgress: 100,
-        generatedCards: cards,
+        currentStage: GENERATION_STAGES.length - 1,
+        progress: 100,
         isGenerating: false,
+        estimatedCards: cards.length,
       }));
 
-      // Redirect to review page with cards data
-      // For now, we'll just redirect and let the review page handle it
-      // In the future, we can pass data via URL params or session storage
-      setTimeout(() => {
-        router.push("/create/review");
-      }, 2000);
+      return cards;
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate flashcards",
-        uploadStep: "error",
         isGenerating: false,
+        error: error instanceof Error ? error.message : "Generation failed",
       }));
+      throw error;
     }
   };
 
-  // Handle retry for text extraction
-  const handleRetry = () => {
-    if (state.fileUrl && state.fileName) {
-      handleFileUploaded(state.fileUrl, state.fileName);
-    }
+  const animateProgress = (
+    startProgress: number,
+    endProgress: number,
+    duration: number,
+    totalWords: number,
+    stageIndex: number
+  ): Promise<void> => {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const progressDiff = endProgress - startProgress;
+
+      const updateProgress = () => {
+        const elapsed = Date.now() - startTime;
+        const progressRatio = Math.min(elapsed / duration, 1);
+
+        // Use easing function for more natural progress
+        const easedProgress = easeOutCubic(progressRatio);
+        const currentProgress = startProgress + progressDiff * easedProgress;
+
+        // Simulate words processed
+        const wordsProcessed = Math.floor((totalWords * currentProgress) / 100);
+
+        setState((prev) => ({
+          ...prev,
+          progress: currentProgress,
+          wordsProcessed,
+        }));
+
+        if (progressRatio < 1) {
+          requestAnimationFrame(updateProgress);
+        } else {
+          resolve();
+        }
+      };
+
+      updateProgress();
+    });
   };
 
-  // Handle going back to previous step
-  const handleBack = () => {
-    setState((prev) => ({
-      ...prev,
-      step: prev.step === "settings" ? "preview" : "upload",
-      error: undefined,
-    }));
-  };
+  return { state, startGeneration, cancelGeneration };
+}
 
-  // Handle proceeding to settings
-  const handleProceedToSettings = () => {
-    setState((prev) => ({
-      ...prev,
-      step: "settings",
-    }));
-  };
+// Easing function for natural progress animation
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
 
-  const estimatedCardCount = Math.max(
-    1,
-    Math.floor(state.extractedText.split(/\s+/).length / 50)
-  );
+// Enhanced generation progress component
+interface GenerationProgressProps {
+  state: GenerationState;
+  onCancel: () => void;
+}
+
+export function GenerationProgress({
+  state,
+  onCancel,
+}: GenerationProgressProps) {
+  const currentStage = GENERATION_STAGES[state.currentStage];
+  const isLastStage = state.currentStage === GENERATION_STAGES.length - 1;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Create New Flashcard Set
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Upload a document and let AI generate personalized flashcards for your
-          study materials
-        </p>
-      </div>
-
-      {/* Error Display */}
-      {state.error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Progress Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card
-          className={`bg-card border-border ${
-            state.step === "upload" ? "ring-2 ring-primary" : ""
-          }`}
-        >
-          <CardHeader className="text-center">
-            <div
-              className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
-                state.step === "upload" ? "bg-primary" : "bg-primary/10"
-              }`}
-            >
-              <Upload
-                className={`w-6 h-6 ${
-                  state.step === "upload"
-                    ? "text-primary-foreground"
-                    : "text-primary"
-                }`}
-              />
-            </div>
-            <CardTitle className="text-foreground">1. Upload</CardTitle>
-            <CardDescription>
-              Upload your PDF, text file, or paste content directly
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <Card
-          className={`bg-card border-border ${
-            state.step === "preview" || state.step === "settings"
-              ? "ring-2 ring-primary"
-              : ""
-          }`}
-        >
-          <CardHeader className="text-center">
-            <div
-              className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
-                state.step === "preview" || state.step === "settings"
-                  ? "bg-primary"
-                  : "bg-primary/10"
-              }`}
-            >
-              <Brain
-                className={`w-6 h-6 ${
-                  state.step === "preview" || state.step === "settings"
-                    ? "text-primary-foreground"
-                    : "text-primary"
-                }`}
-              />
-            </div>
-            <CardTitle className="text-foreground">2. Generate</CardTitle>
-            <CardDescription>
-              AI analyzes your content and creates targeted Q&A pairs
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <Card
-          className={`bg-card border-border ${
-            state.step === "generating" || state.step === "complete"
-              ? "ring-2 ring-primary"
-              : ""
-          }`}
-        >
-          <CardHeader className="text-center">
-            <div
-              className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
-                state.step === "generating" || state.step === "complete"
-                  ? "bg-primary"
-                  : "bg-primary/10"
-              }`}
-            >
-              <FileText
-                className={`w-6 h-6 ${
-                  state.step === "generating" || state.step === "complete"
-                    ? "text-primary-foreground"
-                    : "text-primary"
-                }`}
-              />
-            </div>
-            <CardTitle className="text-foreground">3. Review</CardTitle>
-            <CardDescription>
-              Review, edit, and customize your flashcards before saving
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Main Content Based on Current Step */}
-      {state.step === "upload" && (
-        <FileUploader
-          onFileUploaded={handleFileUploaded}
-          onTextInput={handleTextInput}
-          isExtracting={state.isExtracting}
-        />
-      )}
-
-      {state.step === "preview" && (
+    <Card className="bg-card border-border">
+      <CardContent className="p-6">
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={handleBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </div>
-
-          <FilePreview
-            fileName={state.fileName}
-            extractedText={state.extractedText}
-            isExtracting={state.isExtracting}
-            onRetry={handleRetry}
-            source={state.source}
-          />
-
-          {!state.isExtracting && state.extractedText && (
-            <div className="flex justify-end">
-              <Button onClick={handleProceedToSettings} size="lg">
-                Configure Generation
-                <Brain className="w-4 h-4 ml-2" />
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain className="w-6 h-6 text-primary animate-pulse" />
+              <h3 className="font-semibold text-foreground">
+                Generating Flashcards
+              </h3>
+            </div>
+            {state.canCancel && !isLastStage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onCancel}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
               </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {state.step === "settings" && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={handleBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Preview
-            </Button>
+            )}
           </div>
 
-          <GenerationSettings
-            onGenerate={handleGenerate}
-            isGenerating={state.isGenerating}
-            estimatedCardCount={estimatedCardCount}
-          />
+          {/* Overall Progress */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-foreground">
+                {currentStage.label}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(state.progress)}%
+              </span>
+            </div>
+            <Progress value={state.progress} className="h-3" />
+          </div>
+
+          {/* Current Stage Details */}
+          <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground mb-1">
+                {currentStage.description}
+              </p>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>
+                  {state.wordsProcessed.toLocaleString()} /{" "}
+                  {state.totalWords.toLocaleString()} words
+                </span>
+                <span>~{state.estimatedCards} cards expected</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stage Timeline */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-foreground">
+              Progress Timeline
+            </h4>
+            <div className="space-y-2">
+              {GENERATION_STAGES.slice(0, -1).map((stage, index) => {
+                const isCompleted = index < state.currentStage;
+                const isCurrent = index === state.currentStage;
+
+                return (
+                  <div key={stage.id} className="flex items-center gap-3">
+                    <div
+                      className={`
+                        w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
+                        ${
+                          isCompleted
+                            ? "bg-green-100 text-green-700 border-2 border-green-300"
+                            : isCurrent
+                            ? "bg-primary/10 text-primary border-2 border-primary"
+                            : "bg-muted text-muted-foreground border-2 border-muted"
+                        }
+                      `}
+                    >
+                      {isCompleted ? "✓" : index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p
+                        className={`text-sm ${
+                          isCompleted || isCurrent
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {stage.label}
+                      </p>
+                    </div>
+                    {isCurrent && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
+                        <div className="w-1 h-1 bg-primary rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                        <div className="w-1 h-1 bg-primary rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* AI Tips */}
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-foreground mb-2">
+              🤖 AI Generation Tips
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              Our AI is analyzing your content structure and creating questions
+              that test comprehension, recall, and application. Each card is
+              crafted to maximize your learning effectiveness.
+            </p>
+          </div>
         </div>
-      )}
-
-      {state.step === "generating" && state.uploadStep && (
-        <div className="space-y-6">
-          <UploadProgress
-            currentStep={state.uploadStep}
-            progress={state.uploadProgress}
-            message={
-              state.uploadStep === "generating"
-                ? `Creating ${estimatedCardCount} flashcards from your content...`
-                : undefined
-            }
-            error={state.error}
-          />
-        </div>
-      )}
-
-      {state.step === "complete" && (
-        <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-          <CardHeader className="text-center">
-            <CardTitle className="text-green-800 dark:text-green-200">
-              Flashcards Generated Successfully!
-            </CardTitle>
-            <CardDescription className="text-green-600 dark:text-green-400">
-              {state.generatedCards?.length || estimatedCardCount} flashcards
-              have been created. Redirecting to review page...
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      {/* Tips Section (shown in upload step) */}
-      {state.step === "upload" && (
-        <Card className="mt-8 bg-muted/50 border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">
-              💡 Tips for Better Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-muted-foreground">
-              <li>
-                • Upload well-structured content with clear concepts and
-                definitions
-              </li>
-              <li>
-                • Longer texts (500+ words) generate more comprehensive
-                flashcards
-              </li>
-              <li>
-                • Academic papers, textbook chapters, and lecture notes work
-                best
-              </li>
-              <li>
-                • You can edit and customize all generated flashcards in the
-                next step
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

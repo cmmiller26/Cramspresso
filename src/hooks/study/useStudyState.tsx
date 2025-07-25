@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Flashcard, StudyRound, StudySession } from "@/lib/flashcards";
-import { useStudyKeyboard } from ".";
+import { useStudyKeyboard } from "./useStudyKeyboard";
 
 interface SetData {
   id: string;
