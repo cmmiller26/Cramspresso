@@ -9,8 +9,8 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import {
   StudyCardSkeleton,
   StudyProgressSkeleton,
-} from "@/components/shared/SkeletonLoader"; // ✅ ADD
-import { ErrorState, StudyModeError } from "@/components/shared/ErrorStates"; // ✅ IMPROVED
+} from "@/components/shared/SkeletonLoader";
+import { ErrorState, StudyModeError } from "@/components/shared/ErrorStates";
 
 export default function StudyPage() {
   const { setId } = useParams() as { setId: string };
@@ -42,6 +42,13 @@ export default function StudyPage() {
     actions,
   } = useStudyState(setId);
 
+  // ✅ IMPROVED: Update document title when data loads
+  useEffect(() => {
+    if (studySession?.setName) {
+      document.title = `Studying: ${studySession.setName} - Cramspresso`;
+    }
+  }, [studySession?.setName]);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoaded) return;
@@ -50,18 +57,18 @@ export default function StudyPage() {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  // ✅ IMPROVED: Better auth loading state
+  // Better auth loading state
   if (!isLoaded || !isSignedIn) {
     return (
       <LoadingSpinner
         size="lg"
         text="Checking authentication..."
-        overlay={true} // ✅ Use overlay for full-screen loading
+        overlay={true}
       />
     );
   }
 
-  // ✅ IMPROVED: Use skeleton loading for initial load
+  // Use skeleton loading for initial load
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-6">
@@ -107,7 +114,7 @@ export default function StudyPage() {
     );
   }
 
-  // ✅ IMPROVED: Better error state with specific study error component
+  // Better error state with specific study error component
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -119,7 +126,7 @@ export default function StudyPage() {
     );
   }
 
-  // ✅ IMPROVED: Better no-data error state
+  // Better no-data error state
   if (!setData || !studySession || !currentRound) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -133,7 +140,7 @@ export default function StudyPage() {
     );
   }
 
-  // ✅ IMPROVED: Check for empty set
+  // Check for empty set
   if (setData.cards.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -148,34 +155,31 @@ export default function StudyPage() {
   }
 
   return (
-    <>
-      <title>{`Studying: ${studySession.setName} - Cramspresso`}</title>
-      <StudyInterface
-        // Session and round data
-        studySession={studySession}
-        currentRound={currentRound}
-        // Current card state
-        showAnswer={showAnswer}
-        feedback={feedback}
-        isTransitioning={isTransitioning}
-        // Actions (all properly memoized in the hook)
-        onShowAnswer={actions.onShowAnswer}
-        onNext={actions.onNext}
-        onPrevious={actions.onPrevious}
-        // Round management
-        onShuffleRound={actions.onShuffleRound}
-        onResetToOriginal={actions.onResetToOriginal}
-        onStartReviewRound={actions.onStartReviewRound}
-        onRestartStudySession={actions.onRestartStudySession}
-        // UI state
-        shuffled={shuffled}
-        showKeyboardHelp={showKeyboardHelp}
-        onToggleKeyboardHelp={actions.onToggleKeyboardHelp}
-        // Loading and error handling
-        controlsLoading={controlsLoading}
-        controlsError={controlsError}
-        onClearControlsError={actions.onClearControlsError}
-      />
-    </>
+    <StudyInterface
+      // Session and round data
+      studySession={studySession}
+      currentRound={currentRound}
+      // Current card state
+      showAnswer={showAnswer}
+      feedback={feedback}
+      isTransitioning={isTransitioning}
+      // Actions (all properly memoized in the hook)
+      onShowAnswer={actions.onShowAnswer}
+      onNext={actions.onNext}
+      onPrevious={actions.onPrevious}
+      // Round management
+      onShuffleRound={actions.onShuffleRound}
+      onResetToOriginal={actions.onResetToOriginal}
+      onStartReviewRound={actions.onStartReviewRound}
+      onRestartStudySession={actions.onRestartStudySession}
+      // UI state
+      shuffled={shuffled}
+      showKeyboardHelp={showKeyboardHelp}
+      onToggleKeyboardHelp={actions.onToggleKeyboardHelp}
+      // Loading and error handling
+      controlsLoading={controlsLoading}
+      controlsError={controlsError}
+      onClearControlsError={actions.onClearControlsError}
+    />
   );
 }
