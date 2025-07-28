@@ -17,9 +17,11 @@ interface UploadProgressData {
   fileName: string;
 }
 
-interface Props {
-  onClientUploadComplete: (files: ClientUploadedFileData<null>[]) => void;
+interface UploadZoneProps {
+  onClientUploadComplete: (files: ClientUploadedFileData<unknown>[]) => void;
   onUploadError?: (error: Error) => void;
+  onUploadBegin?: () => void;
+  onUploadProgress?: (progress: number) => void;
   disabled?: boolean;
 }
 
@@ -46,8 +48,10 @@ const formatTime = (seconds: number): string => {
 export function UploadZone({
   onClientUploadComplete,
   onUploadError,
+  onUploadBegin,
+  onUploadProgress,
   disabled = false,
-}: Props) {
+}: UploadZoneProps) {
   const [uploadState, setUploadState] = useState<{
     isUploading: boolean;
     progress: UploadProgressData | null;
@@ -60,31 +64,65 @@ export function UploadZone({
     isCompleted: false,
   });
 
-  const handleUploadProgress = useCallback((progress: number, file?: File) => {
-    if (!file) return;
+  // Track the current file being uploaded
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [uploadStartTime, setUploadStartTime] = useState<number>(0);
 
-    const uploadedBytes = (file.size * progress) / 100;
+  const handleUploadProgress = useCallback((progress: number) => {
+    if (!currentFile) {
+      return;
+    }
 
-    // Estimate upload speed (simplified calculation)
-    const estimatedSpeed = uploadedBytes / 2; // Rough estimate
-    const remainingBytes = file.size - uploadedBytes;
-    const estimatedTime = remainingBytes / Math.max(estimatedSpeed, 1);
+    const uploadedBytes = (currentFile.size * progress) / 100;
+    const currentTime = Date.now();
+    const elapsedTime = (currentTime - uploadStartTime) / 1000; // seconds
+
+    // Calculate upload speed based on elapsed time
+    const estimatedSpeed = elapsedTime > 0 ? uploadedBytes / elapsedTime : 0;
+    const remainingBytes = currentFile.size - uploadedBytes;
+    const estimatedTime = estimatedSpeed > 0 ? remainingBytes / estimatedSpeed : 0;
+
+    const progressData = {
+      progress,
+      uploadSpeed: formatSpeed(estimatedSpeed),
+      uploadedSize: formatFileSize(uploadedBytes),
+      totalSize: formatFileSize(currentFile.size),
+      estimatedTime: formatTime(estimatedTime),
+      fileName: currentFile.name,
+    };
 
     setUploadState((prev) => ({
       ...prev,
       isUploading: true,
-      progress: {
-        progress,
-        uploadSpeed: formatSpeed(estimatedSpeed),
-        uploadedSize: formatFileSize(uploadedBytes),
-        totalSize: formatFileSize(file.size),
-        estimatedTime: formatTime(estimatedTime),
-        fileName: file.name,
-      },
+      progress: progressData,
     }));
+
+    // Call the parent's progress callback
+    onUploadProgress?.(progress);
+  }, [currentFile, uploadStartTime, onUploadProgress]);
+
+  const handleBeforeUploadBegin = useCallback((files: File[]) => {
+    if (files.length > 0) {
+      setCurrentFile(files[0]);
+      setUploadStartTime(Date.now());
+    }
+    
+    return files;
   }, []);
 
-  const handleUploadComplete = (files: ClientUploadedFileData<null>[]) => {
+  const handleUploadBegin = useCallback(() => {
+    setUploadState((prev) => ({
+      ...prev,
+      isUploading: true,
+      error: null,
+      isCompleted: false,
+    }));
+
+    // Call the parent's begin callback
+    onUploadBegin?.();
+  }, [onUploadBegin]);
+
+  const handleUploadComplete = (files: ClientUploadedFileData<unknown>[]) => {
     setUploadState((prev) => ({
       ...prev,
       isUploading: false,
@@ -94,6 +132,9 @@ export function UploadZone({
 
     // Small delay to show completion state
     setTimeout(() => {
+      // Reset file tracking
+      setCurrentFile(null);
+      setUploadStartTime(0);
       onClientUploadComplete(files);
     }, 1000);
   };
@@ -104,6 +145,10 @@ export function UploadZone({
       isUploading: false,
       error: error.message,
     }));
+
+    // Reset file tracking on error
+    setCurrentFile(null);
+    setUploadStartTime(0);
 
     if (onUploadError) {
       onUploadError(error);
@@ -118,6 +163,10 @@ export function UploadZone({
       error: null,
       isCompleted: false,
     });
+    
+    // Reset file tracking
+    setCurrentFile(null);
+    setUploadStartTime(0);
   };
 
   const handleRetry = () => {
@@ -127,6 +176,10 @@ export function UploadZone({
       error: null,
       isCompleted: false,
     });
+    
+    // Reset file tracking
+    setCurrentFile(null);
+    setUploadStartTime(0);
   };
 
   // Show upload progress UI
@@ -230,8 +283,10 @@ export function UploadZone({
   return (
     <UploadDropzone
       endpoint="pdfAndTxt"
+      onBeforeUploadBegin={handleBeforeUploadBegin}
       onClientUploadComplete={handleUploadComplete}
       onUploadError={handleUploadError}
+      onUploadBegin={handleUploadBegin}
       onUploadProgress={handleUploadProgress}
       disabled={disabled}
       config={{
@@ -257,7 +312,7 @@ export function UploadZone({
       }}
       content={{
         label: "Drag and drop your file here",
-        allowedContent: "PDF, TXT, DOCX files up to 10MB",
+        allowedContent: "PDF, TXT, DOCX files up to 8MB",
         button: disabled ? "Uploading..." : "Choose File",
       }}
     />

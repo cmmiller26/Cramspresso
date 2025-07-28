@@ -8,7 +8,8 @@ import { FileUploadError } from "@/components/shared/ErrorStates";
 import { ClientUploadedFileData } from "uploadthing/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, FileText, ArrowLeft } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Upload, FileText, ArrowLeft, CheckCircle } from "lucide-react";
 
 interface FileUploaderProps {
   onFileUploaded: (url: string, fileName: string) => void;
@@ -16,7 +17,12 @@ interface FileUploaderProps {
   isExtracting?: boolean;
 }
 
-type UploaderState = "choosing" | "text-input" | "uploading" | "processing";
+type UploaderState =
+  | "choosing"
+  | "text-input"
+  | "uploading"
+  | "upload-complete"
+  | "processing";
 
 export function FileUploader({
   onFileUploaded,
@@ -26,13 +32,34 @@ export function FileUploader({
   const [state, setState] = useState<UploaderState>("choosing");
   const [textInput, setTextInput] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedFile, setUploadedFile] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
 
-  const handleUploadComplete = (files: ClientUploadedFileData<null>[]) => {
+  const handleUploadBegin = () => {
+    setState("uploading");
+    setUploadProgress(0);
+    setUploadError(null);
+  };
+
+  const handleUploadProgress = (progress: number) => {
+    setUploadProgress(progress);
+  };
+
+  const handleUploadComplete = (files: ClientUploadedFileData<unknown>[]) => {
     if (files && files.length > 0) {
       const file = files[0];
+      setUploadedFile({ url: file.ufsUrl, name: file.name });
+      setState("upload-complete");
       setUploadError(null);
-      setState("processing");
-      onFileUploaded(file.ufsUrl, file.name);
+
+      // Show success state briefly, then proceed to text extraction
+      setTimeout(() => {
+        setState("processing");
+        onFileUploaded(file.ufsUrl, file.name);
+      }, 1500);
     }
   };
 
@@ -40,6 +67,7 @@ export function FileUploader({
     console.error("Upload error:", error);
     setUploadError(error.message || "Failed to upload file");
     setState("choosing");
+    setUploadProgress(0);
   };
 
   const handleTextSubmit = () => {
@@ -64,6 +92,8 @@ export function FileUploader({
     setTextInput("");
     setState("choosing");
     setUploadError(null);
+    setUploadProgress(0);
+    setUploadedFile(null);
   };
 
   const handleShowTextInput = () => {
@@ -74,6 +104,100 @@ export function FileUploader({
   const handleClearError = () => {
     setUploadError(null);
   };
+
+  // Show file uploading progress
+  if (state === "uploading") {
+    return (
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Upload className="w-5 h-5 text-primary animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  Uploading File
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while your file is being uploaded...
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-foreground">
+                  Upload Progress
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round(uploadProgress)}%
+                </span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+
+            {uploadProgress > 0 && (
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">
+                  📤 Your file is being securely uploaded to our servers. This
+                  may take a moment depending on file size.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-center">
+              <Button
+                variant="ghost"
+                onClick={handleBackToChoosing}
+                className="text-muted-foreground"
+              >
+                Cancel Upload
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show upload success state
+  if (state === "upload-complete" && uploadedFile) {
+    return (
+      <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-green-800 dark:text-green-200">
+                  Upload Complete!
+                </h3>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {uploadedFile.name} uploaded successfully
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-green-100 dark:bg-green-900 rounded-lg p-3">
+              <p className="text-sm text-green-700 dark:text-green-300">
+                ✅ File uploaded successfully. Now extracting text content...
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <LoadingSpinner
+                size="sm"
+                text="Preparing for text extraction..."
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Show processing state after upload/text input
   if (state === "processing" || isExtracting) {
@@ -216,6 +340,8 @@ export function FileUploader({
             <UploadZone
               onClientUploadComplete={handleUploadComplete}
               onUploadError={handleUploadError}
+              onUploadBegin={handleUploadBegin}
+              onUploadProgress={handleUploadProgress}
               disabled={isExtracting}
             />
 
@@ -225,7 +351,7 @@ export function FileUploader({
                 📄 Supported File Types
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• PDF documents (up to 10MB)</li>
+                <li>• PDF documents (up to 8MB)</li>
                 <li>• Text files (.txt)</li>
                 <li>• Word documents (.docx)</li>
               </ul>

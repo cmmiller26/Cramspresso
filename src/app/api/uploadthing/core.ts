@@ -9,7 +9,10 @@ const f = createUploadthing({
 });
 
 export const uploadRouter = {
-  pdfAndTxt: f(["pdf", "text"]).onUploadComplete(({ file }) => {
+  pdfAndTxt: f({
+    pdf: { maxFileSize: "8MB", maxFileCount: 1 },
+    text: { maxFileSize: "8MB", maxFileCount: 1 },
+  }).onUploadComplete(({ file }) => {
     console.log("File uploaded successfully:", file.ufsUrl);
   }),
 } satisfies FileRouter;
