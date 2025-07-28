@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/shared/LoadingButton"; // ✅ ADD
+import { LoadingButton } from "@/components/shared/LoadingButton";
 import { Trophy, Clock, Target, RotateCcw, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { StudySession, StudyRound } from "@/lib/flashcards";
@@ -14,6 +14,12 @@ interface StudyCompleteProps {
   onStartReviewRound: () => void;
   onStartMissedCardsRound: () => void;
   onFinishSession: () => void;
+  // Loading states for async actions
+  isLoading?: {
+    studyEntireSet: boolean;
+    reviewRound: boolean;
+    missedCardsRound: boolean;
+  };
 }
 
 export const StudyComplete = memo(function StudyComplete({
@@ -22,6 +28,11 @@ export const StudyComplete = memo(function StudyComplete({
   onStudyEntireSet,
   onStartReviewRound,
   onStartMissedCardsRound,
+  isLoading = {
+    studyEntireSet: false,
+    reviewRound: false,
+    missedCardsRound: false,
+  },
 }: StudyCompleteProps) {
   // Current round stats
   const correctCount = currentRound.correctAnswers.length;
@@ -62,6 +73,11 @@ export const StudyComplete = memo(function StudyComplete({
     studySession.allMissedCards.length !== currentRound.missedCards.length;
   const hasCompletedMultipleRounds = studySession.rounds.length > 1;
   const isPerfectRound = correctCount === currentRound.totalCards;
+
+  const anyLoading =
+    isLoading.studyEntireSet ||
+    isLoading.reviewRound ||
+    isLoading.missedCardsRound;
 
   // Format time helper
   const formatTime = (seconds: number) => {
@@ -223,7 +239,7 @@ export const StudyComplete = memo(function StudyComplete({
           </div>
         </div>
 
-        {/* Celebration Message */}
+        {/* Celebration Messages */}
         {isPerfectRound && (
           <div className="text-center mb-6 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
             <p className="text-green-700 dark:text-green-300 font-medium">
@@ -248,6 +264,9 @@ export const StudyComplete = memo(function StudyComplete({
           {hasCurrentRoundMissedCards && (
             <LoadingButton
               onClick={onStartReviewRound}
+              loading={isLoading.reviewRound}
+              disabled={anyLoading}
+              loadingText="Starting review..."
               variant="outline"
               className="w-full h-12 text-left flex items-center justify-between"
             >
@@ -261,6 +280,9 @@ export const StudyComplete = memo(function StudyComplete({
           {hasDifferentMissedCounts && (
             <LoadingButton
               onClick={onStartMissedCardsRound}
+              loading={isLoading.missedCardsRound}
+              disabled={anyLoading}
+              loadingText="Starting review..."
               variant="outline"
               className="w-full h-12 text-left flex items-center justify-between"
             >
@@ -274,6 +296,9 @@ export const StudyComplete = memo(function StudyComplete({
           {/* Study Again */}
           <LoadingButton
             onClick={onStudyEntireSet}
+            loading={isLoading.studyEntireSet}
+            disabled={anyLoading}
+            loadingText="Restarting study..."
             className="w-full h-12 text-left flex items-center justify-between"
           >
             <span>Study entire set again</span>
@@ -284,6 +309,7 @@ export const StudyComplete = memo(function StudyComplete({
           <Link href={`/sets/${studySession.setId}`} className="block">
             <Button
               variant="ghost"
+              disabled={anyLoading}
               className="w-full h-12 text-left flex items-center justify-between"
             >
               <span>Back to set details</span>

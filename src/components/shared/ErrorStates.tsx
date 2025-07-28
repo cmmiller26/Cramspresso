@@ -1,5 +1,3 @@
-// src/components/shared/ErrorStates.tsx
-
 import {
   AlertTriangle,
   RefreshCw,
@@ -9,6 +7,7 @@ import {
   Upload,
   FileText,
   Brain,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -129,6 +128,110 @@ export function StudyModeError({
           <Button onClick={onRetry}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Study session loading error
+export function StudyLoadingError({
+  error,
+  onRetry,
+  onGoBack,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onGoBack?: () => void;
+}) {
+  return (
+    <div className="bg-card border border-destructive/20 rounded-lg p-8 text-center min-h-[400px] flex flex-col justify-center">
+      <div className="p-3 bg-destructive/10 rounded-full mx-auto w-fit mb-4">
+        <Brain className="h-8 w-8 text-destructive" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground mb-2">
+        Unable to Start Study Session
+      </h3>
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
+      <div className="flex gap-3 justify-center">
+        {onGoBack && (
+          <Button onClick={onGoBack} variant="outline">
+            Go Back
+          </Button>
+        )}
+        {onRetry && (
+          <Button onClick={onRetry}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Study controls error (for when shuffle/reset fails)
+export function StudyControlsError({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 mb-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="font-medium text-destructive mb-1">Control Error</h4>
+          <p className="text-sm text-destructive/80 mb-3">{error}</p>
+          <div className="flex gap-2">
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            )}
+            {onDismiss && (
+              <Button onClick={onDismiss} variant="ghost" size="sm">
+                Dismiss
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Empty study session error
+export function EmptyStudySetError({
+  setName,
+  onGoBack,
+}: {
+  setName: string;
+  onGoBack?: () => void;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-lg p-8 text-center min-h-[400px] flex flex-col justify-center">
+      <div className="p-3 bg-muted/50 rounded-full mx-auto w-fit mb-4">
+        <BookOpen className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground mb-2">
+        No Cards to Study
+      </h3>
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+        The set &quot;{setName}&quot; doesn&apos;t contain any flashcards yet.
+        Add some cards before starting a study session.
+      </p>
+      <div className="flex gap-3 justify-center">
+        {onGoBack && (
+          <Button onClick={onGoBack} variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Set
           </Button>
         )}
       </div>

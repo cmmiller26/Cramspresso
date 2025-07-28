@@ -67,16 +67,26 @@ export function StatsOverviewSkeleton() {
 // Study Mode Skeletons
 export function StudyCardSkeleton() {
   return (
-    <div className="bg-card border border-border rounded-lg p-8 space-y-6 min-h-[400px]">
-      <div className="text-center space-y-4">
-        <Skeleton className="h-6 w-20 mx-auto" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-6 w-4/5 mx-auto" />
-        <Skeleton className="h-6 w-3/4 mx-auto" />
+    <div className="w-full max-w-2xl mx-auto">
+      {/* Card skeleton */}
+      <div className="h-[400px] mb-6">
+        <div className="bg-card border border-border rounded-lg shadow-lg p-8 h-full flex flex-col justify-center items-center text-center">
+          <Skeleton className="h-4 w-20 mb-4" />
+          <Skeleton className="h-8 w-full mb-2" />
+          <Skeleton className="h-8 w-4/5 mb-2" />
+          <Skeleton className="h-8 w-3/4 mb-6" />
+          <Skeleton className="h-4 w-32" />
+        </div>
       </div>
-      <div className="flex justify-center space-x-4 mt-8">
-        <Skeleton className="h-10 w-24" />
-        <Skeleton className="h-10 w-24" />
+
+      {/* Controls skeleton */}
+      <div className="h-[120px] flex items-center justify-center">
+        <div className="w-full max-w-md mx-auto text-center">
+          <Skeleton className="h-4 w-48 mx-auto mb-3" />
+          <div className="flex justify-center gap-3">
+            <Skeleton className="h-10 w-20" />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -84,16 +94,103 @@ export function StudyCardSkeleton() {
 
 export function StudyProgressSkeleton() {
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-4 w-20" />
+    <div className="bg-card border border-border rounded-lg p-4">
+      <div className="space-y-3">
+        {/* Progress header */}
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+
+        {/* Progress bar */}
+        <div className="space-y-2">
+          <Skeleton className="h-2 w-full" />
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+
+        {/* Session totals */}
+        <div className="pt-2 border-t border-border space-y-2">
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+        </div>
       </div>
-      <Skeleton className="h-2 w-full" />
-      <div className="flex justify-between text-sm">
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-3 w-16" />
+    </div>
+  );
+}
+
+export function StudyCompleteSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-6">
+        {/* Header skeleton */}
+        <div className="text-center mb-8">
+          <Skeleton className="h-16 w-16 mx-auto mb-4" variant="circular" />
+          <Skeleton className="h-8 w-64 mx-auto mb-2" />
+          <Skeleton className="h-5 w-32 mx-auto" />
+        </div>
+
+        {/* Stats grid skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-card border border-border rounded-lg p-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Skeleton className="h-5 w-5" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons skeleton */}
+        <div className="max-w-md mx-auto space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function StudyControlsSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-card border border-border rounded-lg">
+        {/* Left: Session Controls */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-28" />
+          <Skeleton className="h-8 w-32" />
+        </div>
+
+        {/* Center: Progress Info */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-16" />
+        </div>
+
+        {/* Right: Navigation */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-20" />
+        </div>
       </div>
     </div>
   );

@@ -1,14 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Keyboard, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Keyboard, AlertTriangle, X } from "lucide-react";
 import Link from "next/link";
 import { StudyCard } from "./StudyCard";
 import { StudyProgress } from "./StudyProgress";
 import { StudyControls } from "./StudyControls";
 import { StudyTimer } from "./StudyTimer";
 import { StudyKeyboardShortcuts } from "./StudyKeyboardShortcuts";
-import { StudyComplete } from "./StudyComplete"; // ✅ ADD: Import StudyComplete
+import { StudyComplete } from "./StudyComplete";
 import type { StudySession, StudyRound } from "@/lib/flashcards";
 
 interface StudyInterfaceProps {
@@ -84,26 +84,24 @@ export function StudyInterface({
   // Check if round is complete
   const isRoundComplete = currentRound.currentIndex >= currentRound.totalCards;
 
-  // ✅ IMPROVED: Use dedicated StudyComplete component instead of inline logic
+  // Use dedicated StudyComplete component for completion
   if (isRoundComplete) {
     return (
       <StudyComplete
         studySession={studySession}
         currentRound={currentRound}
         onStudyEntireSet={() => {
-          // Restart the entire study session
           if (onRestartStudySession) {
             onRestartStudySession();
           }
         }}
         onStartReviewRound={() => {
-          // Start a new review round with missed cards from current round
           if (onStartReviewRound && currentRound.missedCards.length > 0) {
             const reviewRound: StudyRound = {
               roundNumber: currentRound.roundNumber + 1,
               roundType: "review",
               startTime: new Date(),
-              cards: currentRound.missedCards, // Only the missed cards from this round
+              cards: currentRound.missedCards,
               currentIndex: 0,
               totalCards: currentRound.missedCards.length,
               studiedCards: [],
@@ -113,7 +111,6 @@ export function StudyInterface({
               missedCards: [],
             };
 
-            // Add the review round to the session
             const updatedSession = {
               ...studySession,
               currentRoundIndex: studySession.currentRoundIndex + 1,
@@ -124,13 +121,12 @@ export function StudyInterface({
           }
         }}
         onStartMissedCardsRound={() => {
-          // Start a review round with ALL missed cards from the entire session
           if (onStartReviewRound && studySession.allMissedCards.length > 0) {
             const missedCardsRound: StudyRound = {
               roundNumber: currentRound.roundNumber + 1,
               roundType: "missed",
               startTime: new Date(),
-              cards: studySession.allMissedCards, // All missed cards from session
+              cards: studySession.allMissedCards,
               currentIndex: 0,
               totalCards: studySession.allMissedCards.length,
               studiedCards: [],
@@ -140,7 +136,6 @@ export function StudyInterface({
               missedCards: [],
             };
 
-            // Add the missed cards round to the session
             const updatedSession = {
               ...studySession,
               currentRoundIndex: studySession.currentRoundIndex + 1,
@@ -151,7 +146,6 @@ export function StudyInterface({
           }
         }}
         onFinishSession={() => {
-          // Navigate back to the set detail page
           window.location.href = `/sets/${studySession.setId}`;
         }}
       />
@@ -211,18 +205,21 @@ export function StudyInterface({
         </div>
       </div>
 
-      {/* Controls Error Banner */}
+      {/* Enhanced controls error banner */}
       {controlsError && onClearControlsError && (
-        <div className="mb-4 flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
-          <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
-          <span className="text-destructive flex-1">{controlsError}</span>
+        <div className="mb-4 flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-medium text-destructive mb-1">Control Error</h4>
+            <p className="text-sm text-destructive/80">{controlsError}</p>
+          </div>
           <Button
             onClick={onClearControlsError}
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/20"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/20"
           >
-            ×
+            <X className="h-4 w-4" />
           </Button>
         </div>
       )}

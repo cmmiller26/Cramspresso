@@ -2,7 +2,8 @@
 
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/shared/LoadingButton"; // ✅ ADD
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { InlineLoading } from "@/components/shared/LoadingSpinner";
 import { Shuffle, RotateCcw, ChevronLeft } from "lucide-react";
 
 interface StudyControlsProps {
@@ -21,7 +22,6 @@ interface StudyControlsProps {
   disabled?: boolean;
 }
 
-// ✅ PERFORMANCE: Wrapped in React.memo to prevent unnecessary re-renders
 export const StudyControls = memo(function StudyControls({
   shuffled,
   onShuffle,
@@ -42,7 +42,6 @@ export const StudyControls = memo(function StudyControls({
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-card border border-border rounded-lg">
         {/* Left: Session Controls */}
         <div className="flex items-center gap-2">
-          {/* ✅ IMPROVED: Use LoadingButton for shuffle */}
           <LoadingButton
             onClick={onShuffle}
             disabled={isDisabled}
@@ -56,7 +55,6 @@ export const StudyControls = memo(function StudyControls({
             Shuffle Cards
           </LoadingButton>
 
-          {/* ✅ IMPROVED: Use LoadingButton for reset */}
           {shuffled && (
             <LoadingButton
               onClick={onResetToOriginal}
@@ -98,15 +96,19 @@ export const StudyControls = memo(function StudyControls({
         </div>
       </div>
 
-      {/* ✅ IMPROVED: Better loading indicator */}
+      {/* Loading indicator */}
       {anyLoading && (
         <div className="text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-full text-sm text-muted-foreground border border-border">
-            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-            <span>
-              {isLoading.shuffle && "Shuffling cards..."}
-              {isLoading.reset && "Resetting to original order..."}
-            </span>
+            <InlineLoading
+              text={
+                isLoading.shuffle
+                  ? "Shuffling cards..."
+                  : isLoading.reset
+                  ? "Resetting to original order..."
+                  : "Processing..."
+              }
+            />
           </div>
         </div>
       )}
