@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { UploadZone } from "@/components/shared/UploadZone";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { FileUploadError } from "@/components/shared/ErrorStates";
 import { ClientUploadedFileData } from "uploadthing/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, FileText, AlertCircle, ArrowLeft } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
+import { Upload, FileText, ArrowLeft } from "lucide-react";
 
 interface FileUploaderProps {
   onFileUploaded: (url: string, fileName: string) => void;
@@ -38,7 +39,7 @@ export function FileUploader({
   const handleUploadError = (error: Error) => {
     console.error("Upload error:", error);
     setUploadError(error.message || "Failed to upload file");
-    setState("choosing"); // Reset to choosing state
+    setState("choosing");
   };
 
   const handleTextSubmit = () => {
@@ -70,46 +71,26 @@ export function FileUploader({
     setUploadError(null);
   };
 
+  const handleClearError = () => {
+    setUploadError(null);
+  };
+
   // Show processing state after upload/text input
   if (state === "processing" || isExtracting) {
     return (
       <Card className="bg-card border-border">
         <CardContent className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary animate-pulse" />
-              <h3 className="font-semibold text-foreground">
-                Processing Your Content
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                <span className="ml-2">
-                  Extracting and analyzing content...
-                </span>
-              </div>
-
-              {/* Simulated progress for text extraction */}
-              <div className="space-y-2">
-                <Progress value={75} className="h-2" />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Analyzing text structure...</span>
-                  <span>~15 seconds</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-muted/30 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">
-                💡 We&apos;re extracting key concepts and preparing your content
-                for AI analysis. This ensures the best possible flashcard
-                generation.
-              </p>
-            </div>
+          <LoadingSpinner
+            size="lg"
+            text="Extracting and analyzing content..."
+            className="py-8"
+          />
+          <div className="bg-muted/30 rounded-lg p-4 mt-6">
+            <p className="text-sm text-muted-foreground">
+              💡 We&apos;re extracting key concepts and preparing your content
+              for AI analysis. This ensures the best possible flashcard
+              generation.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -179,10 +160,10 @@ export function FileUploader({
               </div>
 
               {uploadError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{uploadError}</AlertDescription>
-                </Alert>
+                <FileUploadError
+                  error={uploadError}
+                  onClear={handleClearError}
+                />
               )}
 
               <div className="flex gap-2 justify-end">
@@ -193,13 +174,15 @@ export function FileUploader({
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   onClick={handleTextSubmit}
-                  disabled={isExtracting || textInput.trim().length === 0}
+                  loading={isExtracting}
+                  disabled={textInput.trim().length === 0}
+                  loadingText="Processing..."
                   className="min-w-[120px]"
                 >
-                  {isExtracting ? "Processing..." : "Continue"}
-                </Button>
+                  Continue
+                </LoadingButton>
               </div>
             </div>
           </div>
@@ -220,10 +203,13 @@ export function FileUploader({
           </div>
 
           {uploadError && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{uploadError}</AlertDescription>
-            </Alert>
+            <div className="mb-4">
+              <FileUploadError
+                error={uploadError}
+                onRetry={() => setState("choosing")}
+                onClear={handleClearError}
+              />
+            </div>
           )}
 
           <div className="space-y-4">
@@ -270,14 +256,15 @@ export function FileUploader({
           <p className="text-muted-foreground mb-4">
             Already have your text ready? Paste it directly here
           </p>
-          <Button
-            variant="outline"
+          <LoadingButton
             onClick={handleShowTextInput}
+            loading={isExtracting}
             disabled={isExtracting}
+            variant="outline"
           >
             <FileText className="w-4 h-4 mr-2" />
             Paste Text
-          </Button>
+          </LoadingButton>
         </CardContent>
       </Card>
     </div>

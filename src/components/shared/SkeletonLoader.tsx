@@ -100,22 +100,105 @@ export function StudyProgressSkeleton() {
 }
 
 // Create Flow Skeletons
+export function CreatePageSkeleton() {
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Header skeleton */}
+      <div className="mb-8">
+        <Skeleton className="h-8 w-80 mb-2" />
+        <Skeleton className="h-5 w-96" />
+      </div>
+
+      {/* Process overview skeletons */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="bg-card border border-border rounded-lg p-6 text-center"
+          >
+            <Skeleton className="mx-auto w-12 h-12 rounded-lg mb-4" />
+            <Skeleton className="h-5 w-20 mx-auto mb-2" />
+            <Skeleton className="h-4 w-32 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Main upload area skeleton */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="mb-4">
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center bg-muted/30">
+          <Skeleton className="mx-auto w-12 h-12 mb-4" />
+          <Skeleton className="h-6 w-64 mx-auto mb-2" />
+          <Skeleton className="h-4 w-48 mx-auto mb-4" />
+          <Skeleton className="h-10 w-32 mx-auto mb-4" />
+          <Skeleton className="h-3 w-56 mx-auto" />
+        </div>
+      </div>
+
+      {/* Tips section skeleton */}
+      <div className="mt-8 bg-muted/50 border border-border rounded-lg p-6">
+        <Skeleton className="h-6 w-48 mb-4" />
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FilePreviewSkeleton() {
   return (
     <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10" variant="circular" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-3 w-32" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-6 w-6" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
         </div>
       </div>
-      <div className="space-y-2 pt-4">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-2/3" />
+
+      {/* Text Statistics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="text-center space-y-2">
+            <Skeleton className="h-8 w-12 mx-auto" />
+            <Skeleton className="h-3 w-16 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Content Preview */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <div className="h-32 bg-muted/30 rounded-lg p-4 space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-3 w-full" />
+          ))}
+        </div>
+      </div>
+
+      {/* Quality Indicators */}
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-28" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex justify-between items-center">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -141,10 +224,49 @@ export function GeneratedCardSkeleton() {
 
 export function CardReviewSkeleton({ count = 5 }: { count?: number }) {
   return (
-    <div className="space-y-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <GeneratedCardSkeleton key={i} />
-      ))}
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Header skeleton */}
+      <div className="mb-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-6 w-6" />
+            <div>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-5 w-96" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Cards skeleton */}
+      <div className="space-y-4 mb-8">
+        {Array.from({ length: count }).map((_, i) => (
+          <GeneratedCardSkeleton key={i} />
+        ))}
+      </div>
+
+      {/* Save section skeleton */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <Skeleton className="h-6 w-48 mb-2" />
+        <Skeleton className="h-4 w-64 mb-4" />
+        <div className="space-y-4">
+          <div>
+            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

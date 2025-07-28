@@ -9,7 +9,9 @@ import { ReviewHeader } from "@/components/create/ReviewHeader";
 import { BulkActions } from "@/components/create/BulkActions";
 import { CardsList } from "@/components/create/CardsList";
 import { SaveSection } from "@/components/create/SaveSection";
-import { LoadingSkeleton } from "@/components/create/LoadingSkeleton";
+import { CardReviewSkeleton } from "@/components/shared/SkeletonLoader";
+import { ReviewPageError } from "@/components/shared/ErrorStates";
+import { LoadingButton } from "@/components/shared/LoadingButton";
 import { useReviewCards } from "@/hooks/create/useReviewCards";
 import Link from "next/link";
 
@@ -50,8 +52,20 @@ export default function ReviewPage() {
     // Load cards on mount - this will be handled by the hook
   }, []);
 
+  // Show skeleton while loading
   if (loading) {
-    return <LoadingSkeleton />;
+    return <CardReviewSkeleton count={5} />;
+  }
+
+  // Show error page if there's a major error
+  if (error && cards.length === 0) {
+    return (
+      <ReviewPageError
+        error={error}
+        onRetry={() => window.location.reload()}
+        onGoBack={() => router.push("/create")}
+      />
+    );
   }
 
   return (
@@ -78,8 +92,8 @@ export default function ReviewPage() {
         />
       </div>
 
-      {/* Error Display */}
-      {error && (
+      {/* Error Display - for non-critical errors */}
+      {error && cards.length > 0 && (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -133,13 +147,13 @@ export default function ReviewPage() {
       )}
 
       {/* Empty State */}
-      {cards.length === 0 && !loading && (
+      {cards.length === 0 && !loading && !error && (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">No flashcards to review.</p>
-          <Button onClick={() => router.push("/create")}>
+          <LoadingButton onClick={() => router.push("/create")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back to Create
-          </Button>
+          </LoadingButton>
         </div>
       )}
     </div>

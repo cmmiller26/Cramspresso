@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { Progress } from "@/components/ui/progress";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 interface SaveSectionProps {
@@ -39,16 +40,13 @@ export function SaveSection({
       <CardContent>
         {isSaving ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-medium">
-                Saving flashcard set...
-              </span>
+            <LoadingSpinner size="md" text="Saving flashcard set..." />
+            <div className="space-y-2">
+              <Progress value={saveProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                {saveProgress}% complete
+              </p>
             </div>
-            <Progress value={saveProgress} className="h-2" />
-            <p className="text-sm text-muted-foreground">
-              {saveProgress}% complete
-            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -61,16 +59,21 @@ export function SaveSection({
                 value={setName}
                 onChange={(e) => setSetName(e.target.value)}
                 placeholder="Enter a name for your flashcard set"
-                className="w-full p-3 border border-border rounded-lg bg-background text-foreground"
+                className="w-full p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={!setName.trim()}>
+              <LoadingButton
+                onClick={handleSave}
+                disabled={!setName.trim()}
+                loading={isSaving}
+                loadingText="Saving..."
+              >
                 Save Set ({cards.length} cards)
-              </Button>
+              </LoadingButton>
             </div>
           </div>
         )}

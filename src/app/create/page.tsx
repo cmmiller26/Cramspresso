@@ -9,6 +9,14 @@ import {
   GenerationConfig,
 } from "@/components/create/GenerationSettings";
 import { useGenerationProgress } from "@/hooks/create/useGenerationProgress";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import {
+  CreateFlowError,
+  FileUploadError,
+  GenerationError,
+} from "@/components/shared/ErrorStates";
+import { CreatePageSkeleton } from "@/components/shared/SkeletonLoader";
 import {
   Card,
   CardContent,
@@ -18,8 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, Brain, ArrowLeft, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Upload, FileText, Brain, ArrowLeft, CheckCircle } from "lucide-react";
 
 type FlowStep = "upload" | "preview" | "settings" | "generating" | "complete";
 
@@ -31,6 +38,7 @@ interface UploadState {
   source: "file" | "text";
   isExtracting: boolean;
   error?: string;
+  errorStage?: "upload" | "extraction" | "generation";
   generatedCards?: { question: string; answer: string }[];
 }
 
@@ -49,6 +57,9 @@ export default function CreatePage() {
     isExtracting: false,
   });
 
+  const [lastGenerationConfig, setLastGenerationConfig] =
+    useState<GenerationConfig | null>(null);
+
   // Handle file upload completion
   const handleFileUploaded = async (url: string, fileName: string) => {
     setState((prev) => ({
@@ -59,10 +70,10 @@ export default function CreatePage() {
       source: "file",
       isExtracting: true,
       error: undefined,
+      errorStage: undefined,
     }));
 
     try {
-      // Extract text from uploaded file
       const response = await fetch("/api/flashcards/extract-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,12 +96,12 @@ export default function CreatePage() {
         ...prev,
         error:
           error instanceof Error ? error.message : "Failed to extract text",
+        errorStage: "extraction",
         isExtracting: false,
       }));
     }
   };
 
-  // Handle direct text input
   const handleTextInput = (text: string) => {
     setState((prev) => ({
       ...prev,
@@ -99,17 +110,19 @@ export default function CreatePage() {
       source: "text",
       fileName: undefined,
       fileUrl: undefined,
+      error: undefined,
+      errorStage: undefined,
     }));
   };
 
-  // Handle flashcard generation with enhanced progress
   const handleGenerate = async (config: GenerationConfig) => {
-    console.log("Generation config:", config);
+    setLastGenerationConfig(config); // Save config for potential retry
 
     setState((prev) => ({
       ...prev,
       step: "generating",
       error: undefined,
+      errorStage: undefined,
     }));
 
     try {
@@ -121,7 +134,6 @@ export default function CreatePage() {
         generatedCards: cards,
       }));
 
-      // Redirect to review page
       setTimeout(() => {
         router.push("/create/review");
       }, 2000);
@@ -132,28 +144,43 @@ export default function CreatePage() {
           error instanceof Error
             ? error.message
             : "Failed to generate flashcards",
-        step: "settings", // Go back to settings on error
+        errorStage: "generation",
+        step: "settings",
       }));
     }
   };
 
-  // Handle retry for text extraction
   const handleRetry = () => {
-    if (state.fileUrl && state.fileName) {
+    if (state.errorStage === "extraction" && state.fileUrl && state.fileName) {
       handleFileUploaded(state.fileUrl, state.fileName);
+    } else if (state.errorStage === "upload") {
+      setState((prev) => ({
+        ...prev,
+        step: "upload",
+        error: undefined,
+        errorStage: undefined,
+      }));
     }
   };
 
-  // Handle going back to previous step
+  const handleStartOver = () => {
+    setState({
+      step: "upload",
+      extractedText: "",
+      source: "file",
+      isExtracting: false,
+    });
+  };
+
   const handleBack = () => {
     setState((prev) => ({
       ...prev,
       step: prev.step === "settings" ? "preview" : "upload",
       error: undefined,
+      errorStage: undefined,
     }));
   };
 
-  // Handle proceeding to settings
   const handleProceedToSettings = () => {
     setState((prev) => ({
       ...prev,
@@ -161,10 +188,23 @@ export default function CreatePage() {
     }));
   };
 
+  const handleClearError = () => {
+    setState((prev) => ({
+      ...prev,
+      error: undefined,
+      errorStage: undefined,
+    }));
+  };
+
   const estimatedCardCount = Math.max(
     1,
     Math.floor(state.extractedText.split(/\s+/).length / 50)
   );
+
+  // Show skeleton for initial loading or when transitioning
+  if (state.step === "upload" && !state.error && state.isExtracting) {
+    return <CreatePageSkeleton />;
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -178,14 +218,6 @@ export default function CreatePage() {
         </p>
       </div>
 
-      {/* Error Display */}
-      {state.error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-
       {/* Progress Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card
@@ -196,12 +228,16 @@ export default function CreatePage() {
           <CardHeader className="text-center">
             <div
               className={`mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-2 ${
-                state.step === "upload" ? "bg-primary" : "bg-primary/10"
+                state.step === "upload" ||
+                (state.step === "preview" && state.extractedText)
+                  ? "bg-primary"
+                  : "bg-primary/10"
               }`}
             >
               <Upload
                 className={`w-6 h-6 ${
-                  state.step === "upload"
+                  state.step === "upload" ||
+                  (state.step === "preview" && state.extractedText)
                     ? "text-primary-foreground"
                     : "text-primary"
                 }`}
@@ -275,6 +311,39 @@ export default function CreatePage() {
         </Card>
       </div>
 
+      {/* Error Display */}
+      {state.error && state.errorStage === "upload" && (
+        <div className="mb-6">
+          <FileUploadError
+            error={state.error}
+            onRetry={handleRetry}
+            onClear={handleClearError}
+          />
+        </div>
+      )}
+
+      {state.error && state.errorStage === "extraction" && (
+        <div className="mb-6">
+          <CreateFlowError
+            stage="extraction"
+            onRetry={handleRetry}
+            onStartOver={handleStartOver}
+          />
+        </div>
+      )}
+
+      {state.error && state.errorStage === "generation" && (
+        <div className="mb-6">
+          <GenerationError
+            error={state.error}
+            onRetry={() =>
+              lastGenerationConfig && handleGenerate(lastGenerationConfig)
+            }
+            onStartOver={handleStartOver}
+          />
+        </div>
+      )}
+
       {/* Main Content Based on Current Step */}
       {state.step === "upload" && (
         <FileUploader
@@ -303,10 +372,10 @@ export default function CreatePage() {
 
           {!state.isExtracting && state.extractedText && (
             <div className="flex justify-end">
-              <Button onClick={handleProceedToSettings} size="lg">
+              <LoadingButton onClick={handleProceedToSettings} size="lg">
                 Configure Generation
                 <Brain className="w-4 h-4 ml-2" />
-              </Button>
+              </LoadingButton>
             </div>
           )}
         </div>
@@ -371,9 +440,9 @@ export default function CreatePage() {
                   </div>
                 </div>
 
-                {/* Current stage message */}
+                {/* Current stage message with loading spinner */}
                 <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <Brain className="w-5 h-5 text-primary mt-0.5" />
+                  <LoadingSpinner size="sm" className="mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-foreground mb-1">
                       {generationState.currentStageDescription}
@@ -436,6 +505,9 @@ export default function CreatePage() {
       {state.step === "complete" && (
         <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
           <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
             <CardTitle className="text-green-800 dark:text-green-200">
               Flashcards Generated Successfully!
             </CardTitle>
@@ -444,11 +516,14 @@ export default function CreatePage() {
               have been created. Redirecting to review page...
             </CardDescription>
           </CardHeader>
+          <CardContent className="text-center">
+            <LoadingSpinner size="sm" text="Redirecting..." />
+          </CardContent>
         </Card>
       )}
 
       {/* Tips Section (shown in upload step) */}
-      {state.step === "upload" && (
+      {state.step === "upload" && !state.error && (
         <Card className="mt-8 bg-muted/50 border-border">
           <CardHeader>
             <CardTitle className="text-foreground">

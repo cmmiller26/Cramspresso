@@ -1,7 +1,8 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { FilePreviewSkeleton } from "@/components/shared/SkeletonLoader";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Download, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
@@ -48,29 +49,7 @@ export function FilePreview({
   };
 
   if (isExtracting) {
-    return (
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 animate-pulse" />
-            Extracting Text...
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-              <span className="ml-2">
-                Processing your {source === "file" ? "file" : "text"}...
-              </span>
-            </div>
-            <div className="h-32 bg-muted/30 rounded-lg animate-pulse"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <FilePreviewSkeleton />;
   }
 
   return (
@@ -87,13 +66,17 @@ export function FilePreview({
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleDownloadText}>
+            <LoadingButton
+              variant="ghost"
+              size="sm"
+              onClick={handleDownloadText}
+            >
               <Download className="w-4 h-4" />
-            </Button>
+            </LoadingButton>
             {onRetry && (
-              <Button variant="ghost" size="sm" onClick={onRetry}>
+              <LoadingButton variant="ghost" size="sm" onClick={onRetry}>
                 <RotateCcw className="w-4 h-4" />
-              </Button>
+              </LoadingButton>
             )}
           </div>
         </div>
@@ -133,7 +116,7 @@ export function FilePreview({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-foreground">Content Preview</h4>
-            <Button
+            <LoadingButton
               variant="ghost"
               size="sm"
               onClick={() => setShowFullText(!showFullText)}
@@ -150,7 +133,7 @@ export function FilePreview({
                   Show All
                 </>
               )}
-            </Button>
+            </LoadingButton>
           </div>
 
           <ScrollArea className={showFullText ? "h-64" : "h-32"}>

@@ -34,18 +34,6 @@ export default function CreateLayout({
                 Create Flashcard Set
               </h2>
             </div>
-
-            {/* Progress indicator - can be enhanced later */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-2 h-2 bg-primary rounded-full" />
-                Upload
-                <div className="w-2 h-2 bg-muted rounded-full" />
-                Review
-                <div className="w-2 h-2 bg-muted rounded-full" />
-                Save
-              </div>
-            </div>
           </div>
         </div>
       </div>
