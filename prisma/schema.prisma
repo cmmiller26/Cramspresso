@@ -12,6 +12,7 @@ model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
   sets      FlashcardSet[]
+  studySessions StudySession[]
   createdAt DateTime @default(now())
 }
 
@@ -21,6 +22,7 @@ model FlashcardSet {
   cards      Flashcard[]
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     String
+  studySessions StudySession[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -33,8 +35,40 @@ model Flashcard {
   answer     String
   set        FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
   setId      String
+  cardResults CardResult[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([question, setId])
+}
+
+// New models for study tracking
+model StudySession {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  set           FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  setId         String
+  startTime     DateTime
+  endTime       DateTime?
+  totalCards    Int
+  correctCards  Int      @default(0)
+  incorrectCards Int     @default(0)
+  skippedCards  Int      @default(0)
+  isReviewSession Boolean @default(false)
+  cardResults   CardResult[]
+  createdAt     DateTime @default(now())
+}
+
+model CardResult {
+  id              String       @id @default(cuid())
+  session         StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId       String
+  card            Flashcard    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId          String
+  wasCorrect      Boolean?     // null = skipped, true = correct, false = incorrect
+  responseTime    Int?         // milliseconds to answer
+  createdAt       DateTime     @default(now())
+
+  @@unique([sessionId, cardId])
 }

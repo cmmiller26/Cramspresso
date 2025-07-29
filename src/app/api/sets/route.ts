@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
   const { name, cards } = await req.json();
   if (typeof name !== "string" || !name.trim())
     return NextResponse.json({ error: "Invalid set name" }, { status: 400 });
-  if (!Array.isArray(cards) || cards.length === 0)
+  if (!Array.isArray(cards))
     return NextResponse.json({ error: "Invalid cards data" }, { status: 400 });
+  // Allow empty cards array for empty sets
   for (let index = 0; index < cards.length; index++) {
     const card = cards[index];
     if (

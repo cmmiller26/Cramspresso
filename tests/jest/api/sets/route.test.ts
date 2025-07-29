@@ -293,21 +293,6 @@ describe("API Route /api/sets - GET and POST operations", () => {
       expect(data.error).toBe("Invalid cards data");
     });
 
-    it("returns 400 for invalid cards data - empty array", async () => {
-      const requestBody = {
-        name: "Test Set",
-        cards: [],
-      };
-
-      mockAuth.mockResolvedValue({ userId: "clerk_test_user_123" } as any);
-
-      const response = await POST(createValidRequest(requestBody));
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Invalid cards data");
-    });
-
     it("returns 400 for invalid card format - missing question", async () => {
       const requestBody = {
         name: "Test Set",

@@ -4,7 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { NextSSRPlugin } from "@uploadthing/react/next-ssr-plugin";
 import { extractRouterConfig } from "uploadthing/server";
 import { ThemeProvider } from "next-themes";
-import { Header } from "@/components/Header";
+import { Header } from "@/components/layout/Header";
 import { uploadRouter } from "./api/uploadthing/core";
 
 const geistSans = Geist({

@@ -1,0 +1,190 @@
+"use client";
+
+import { useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { useStudyState } from "@/hooks/study/useStudyState";
+import { StudyInterface } from "@/components/study/StudyInterface";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import {
+  StudyCardSkeleton,
+  StudyProgressSkeleton,
+  PageSkeleton,
+} from "@/components/shared/SkeletonLoader";
+import { StudyModeError, ErrorState } from "@/components/shared/ErrorStates";
+
+export default function StudyPage() {
+  const { setId } = useParams() as { setId: string };
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
+
+  const {
+    // Data state
+    setData,
+    studySession,
+    currentRound,
+
+    // Card interaction state
+    showAnswer,
+    feedback,
+    isTransitioning,
+
+    // UI state
+    shuffled,
+    showKeyboardHelp,
+
+    // Loading and error state
+    loading,
+    error,
+    controlsLoading,
+    controlsError,
+
+    // Actions
+    actions,
+  } = useStudyState(setId);
+
+  // Update document title when data loads
+  useEffect(() => {
+    if (studySession?.setName) {
+      document.title = `Studying: ${studySession.setName} - Cramspresso`;
+    }
+  }, [studySession?.setName]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  // Auth loading state with overlay
+  if (!isLoaded || !isSignedIn) {
+    return (
+      <LoadingSpinner
+        size="lg"
+        text="Checking authentication..."
+        overlay={true}
+      />
+    );
+  }
+
+  // Initial loading with proper skeleton
+  if (loading) {
+    return (
+      <PageSkeleton>
+        <div className="max-w-4xl mx-auto">
+          {/* Header skeleton */}
+          <div className="flex items-center mb-6">
+            <div className="flex-1 flex justify-start">
+              <div className="h-9 w-24 bg-muted rounded animate-pulse"></div>
+            </div>
+            <div className="flex-1 text-center">
+              <div className="h-6 w-48 bg-muted rounded animate-pulse mx-auto mb-2"></div>
+              <div className="h-4 w-32 bg-muted rounded animate-pulse mx-auto"></div>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <div className="h-9 w-9 bg-muted rounded animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Progress and timer skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <StudyProgressSkeleton />
+            <StudyProgressSkeleton />
+          </div>
+
+          {/* Controls skeleton */}
+          <div className="mb-6 p-4 bg-card border border-border rounded-lg">
+            <div className="flex justify-between items-center">
+              <div className="flex gap-2">
+                <div className="h-8 w-24 bg-muted rounded animate-pulse"></div>
+                <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
+              </div>
+              <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
+              <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Card skeleton */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-2xl">
+              <StudyCardSkeleton />
+            </div>
+          </div>
+        </div>
+      </PageSkeleton>
+    );
+  }
+
+  // Error state with specific study error component
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <StudyModeError
+            onRetry={actions.loadSet}
+            onGoBack={() => router.push("/dashboard")}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Empty set error state
+  if (setData && setData.cards.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <ErrorState
+          title="No cards to study"
+          message="This flashcard set is empty. Add some cards before starting a study session."
+          showRetry={false}
+          className="max-w-md"
+        />
+      </div>
+    );
+  }
+
+  // No data error state
+  if (!setData || !studySession || !currentRound) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <ErrorState
+          title="Study session unavailable"
+          message="Unable to load the study session. The set may have been deleted or you may not have permission to access it."
+          onRetry={actions.loadSet}
+          className="max-w-md"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <StudyInterface
+      // Session and round data
+      studySession={studySession}
+      currentRound={currentRound}
+      // Current card state
+      showAnswer={showAnswer}
+      feedback={feedback}
+      isTransitioning={isTransitioning}
+      // Actions (all properly memoized in the hook)
+      onShowAnswer={actions.onShowAnswer}
+      onNext={actions.onNext}
+      onPrevious={actions.onPrevious}
+      // Round management
+      onShuffleRound={actions.onShuffleRound}
+      onResetToOriginal={actions.onResetToOriginal}
+      onStartReviewRound={actions.onStartReviewRound}
+      onRestartStudySession={actions.onRestartStudySession}
+      // UI state
+      shuffled={shuffled}
+      showKeyboardHelp={showKeyboardHelp}
+      onToggleKeyboardHelp={actions.onToggleKeyboardHelp}
+      // Loading and error handling
+      controlsLoading={controlsLoading}
+      controlsError={controlsError}
+      onClearControlsError={actions.onClearControlsError}
+    />
+  );
+}

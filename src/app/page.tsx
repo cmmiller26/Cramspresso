@@ -1,55 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { NewSetForm } from "@/components/NewSetForm";
-import { UploadZone } from "@/components/UploadZone";
-import { generateFromUrls } from "@/lib/flashcardApi";
-import { Flashcard } from "@/lib/flashcards";
+import { useEffect } from "react";
+import { Hero } from "@/components/marketing/Hero";
+import { Features } from "@/components/marketing/Features";
+import { SampleCard } from "@/components/marketing/SampleCard";
 
 export default function Home() {
-  const [stage, setStage] = useState<"upload" | "preview">("upload");
-  const [cards, setCards] = useState<Flashcard[]>([]);
-
+  const { isSignedIn } = useAuth();
   const router = useRouter();
 
-  async function onUploadComplete(files: { ufsUrl: string }[]) {
-    const urls = files.map((f) => f.ufsUrl);
-    const generated = await generateFromUrls(urls);
-    if (generated.length === 0)
-      return alert("No flashcards generated. Please try again.");
-    setCards(generated);
-    setStage("preview");
-  }
-
-  function renderStage() {
-    switch (stage) {
-      case "upload":
-        return <UploadZone onClientUploadComplete={onUploadComplete} />;
-      case "preview":
-        return (
-          <>
-            <ul className="space-y-4 max-h-64 overflow-auto">
-              {cards.map((c, i) => (
-                <li key={i} className="border p-3 rounded">
-                  <p className="font-semibold">{c.question}</p>
-                  <p>{c.answer}</p>
-                </li>
-              ))}
-            </ul>
-            <NewSetForm
-              cards={cards}
-              onCreate={(id) => router.push(`/sets/${id}`)}
-            />
-          </>
-        );
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (isSignedIn) {
+      router.push("/dashboard");
     }
+  }, [isSignedIn, router]);
+
+  // Show loading or nothing while redirecting authenticated users
+  if (isSignedIn) {
+    return (
+      <main className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center">
+          <p className="text-muted-foreground">Redirecting to dashboard...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
     <>
-      <title>Cramspresso</title>
-      <main className="p-8 mx-auto max-w-xl space-y-6">{renderStage()}</main>
+      <title>Cramspresso - Turn Documents into Smart Flashcards</title>
+      <meta
+        name="description"
+        content="Upload PDFs and documents to generate AI-powered flashcards. Study smarter with personalized Q&A cards created from your materials."
+      />
+
+      <main className="min-h-screen bg-background">
+        <div className="max-w-6xl mx-auto px-4">
+          <Hero />
+          <Features />
+          <SampleCard />
+        </div>
+      </main>
     </>
   );
 }

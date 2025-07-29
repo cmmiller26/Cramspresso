@@ -1,4 +1,4 @@
-import { Flashcard, parseCompletionToCards } from "@/lib/flashcards";
+import { CreateFlashcard, parseCompletionToCards } from "@/lib/flashcards";
 
 describe("parseCompletionToCards - Edge cases and error handling", () => {
   describe("Empty and null responses", () => {
@@ -75,7 +75,7 @@ describe("parseCompletionToCards - Edge cases and error handling", () => {
 
   describe("Large responses and performance", () => {
     it("handles large number of flashcards in JSON format", () => {
-      const largeArray: Flashcard[] = [];
+      const largeArray: CreateFlashcard[] = [];
       for (let i = 1; i <= 100; i++) {
         largeArray.push({
           question: `Question ${i}?`,
