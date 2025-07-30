@@ -1,5 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CardsSessionStorage } from "@/lib/CardsSessionStorage";
+import type { ContentAnalysis } from "./useContentAnalysis";
 
 export interface Flashcard {
   id: string;
@@ -14,166 +16,192 @@ interface EditState {
   answer: string;
 }
 
+interface ReviewCardsState {
+  cards: Flashcard[];
+  loading: boolean;
+  error: string | null;
+  analysis: ContentAnalysis | null;
+  sourceText: string;
+  editStates: Record<string, EditState>;
+  selectedCards: Set<string>;
+  bulkOperationLoading: boolean;
+  isSaving: boolean;
+  saveProgress: number;
+}
+
 export function useReviewCards() {
   const router = useRouter();
 
-  // Core state
-  const [cards, setCards] = useState<Flashcard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<ReviewCardsState>({
+    cards: [],
+    loading: true,
+    error: null,
+    analysis: null,
+    sourceText: "",
+    editStates: {},
+    selectedCards: new Set(),
+    bulkOperationLoading: false,
+    isSaving: false,
+    saveProgress: 0,
+  });
 
-  // Edit state
-  const [editStates, setEditStates] = useState<Record<string, EditState>>({});
+  // Load cards from session storage on mount
+  useEffect(() => {
+    const loadCards = async () => {
+      try {
+        setState((prev) => ({ ...prev, loading: true, error: null }));
 
-  // Selection and bulk operations
-  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
-  const [bulkOperationLoading, setBulkOperationLoading] = useState(false);
+        const sessionData = CardsSessionStorage.load();
 
-  // Save state
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveProgress, setSaveProgress] = useState(0);
+        if (!sessionData || !sessionData.cards.length) {
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error:
+              "No generated cards found. Please generate flashcards first.",
+          }));
+          return;
+        }
 
-  // Load cards function (called on mount)
-  const loadCards = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+        // Convert session cards to review format
+        const cards: Flashcard[] = sessionData.cards.map((card) => ({
+          id: card.id,
+          question: card.question,
+          answer: card.answer,
+          isEditing: false,
+          isNew: false,
+        }));
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+        setState((prev) => ({
+          ...prev,
+          cards,
+          analysis: sessionData.analysis,
+          sourceText: sessionData.sourceText,
+          loading: false,
+        }));
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Failed to load generated cards. Please try generating again.",
+        }));
+      }
+    };
 
-      const mockCards: Flashcard[] = [
-        {
-          id: "1",
-          question: "What is the main topic covered in this document?",
-          answer:
-            "The document covers the key concepts and principles discussed in the uploaded material, focusing on practical applications and real-world examples.",
-        },
-        {
-          id: "2",
-          question: "What are the important points to remember?",
-          answer:
-            "The critical information includes the main definitions, examples, and practical applications mentioned in the source material.",
-        },
-        {
-          id: "3",
-          question: "How can these concepts be applied in practice?",
-          answer:
-            "These concepts can be implemented through systematic approaches, careful planning, and consistent application of the principles outlined.",
-        },
-        {
-          id: "4",
-          question: "What are the key benefits of this approach?",
-          answer:
-            "The main benefits include improved efficiency, better outcomes, and more reliable results when properly implemented.",
-        },
-      ];
-
-      setCards(mockCards);
-    } catch {
-      setError("Failed to load flashcards. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    loadCards();
   }, []);
 
   // Card editing functions
   const startEditing = useCallback(
     (cardId: string) => {
-      const card = cards.find((c) => c.id === cardId);
+      const card = state.cards.find((c) => c.id === cardId);
       if (!card) return;
 
-      setEditStates((prev) => ({
+      setState((prev) => ({
         ...prev,
-        [cardId]: {
-          question: card.question,
-          answer: card.answer,
+        editStates: {
+          ...prev.editStates,
+          [cardId]: {
+            question: card.question,
+            answer: card.answer,
+          },
         },
+        cards: prev.cards.map((c) =>
+          c.id === cardId ? { ...c, isEditing: true } : c
+        ),
       }));
-
-      setCards((prev) =>
-        prev.map((c) => (c.id === cardId ? { ...c, isEditing: true } : c))
-      );
     },
-    [cards]
+    [state.cards]
   );
 
   const cancelEditing = useCallback((cardId: string) => {
-    setEditStates((prev) => {
-      const newState = { ...prev };
-      delete newState[cardId];
-      return newState;
-    });
+    setState((prev) => {
+      const newEditStates = { ...prev.editStates };
+      delete newEditStates[cardId];
 
-    setCards((prev) =>
-      prev.map((c) => (c.id === cardId ? { ...c, isEditing: false } : c))
-    );
+      return {
+        ...prev,
+        editStates: newEditStates,
+        cards: prev.cards.map((c) =>
+          c.id === cardId ? { ...c, isEditing: false } : c
+        ),
+      };
+    });
   }, []);
 
   const saveCard = useCallback(
     async (cardId: string) => {
-      const editState = editStates[cardId];
+      const editState = state.editStates[cardId];
       if (!editState) return;
 
       // Validate content
       if (!editState.question.trim() || !editState.answer.trim()) {
-        setError("Both question and answer are required.");
+        setState((prev) => ({
+          ...prev,
+          error: "Both question and answer are required.",
+        }));
         return;
       }
 
       try {
         // Simulate save operation
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        setCards((prev) =>
-          prev.map((c) =>
-            c.id === cardId
-              ? {
-                  ...c,
-                  question: editState.question.trim(),
-                  answer: editState.answer.trim(),
-                  isEditing: false,
-                  isNew: false,
-                }
-              : c
-          )
-        );
+        setState((prev) => {
+          const newEditStates = { ...prev.editStates };
+          delete newEditStates[cardId];
 
-        setEditStates((prev) => {
-          const newState = { ...prev };
-          delete newState[cardId];
-          return newState;
+          return {
+            ...prev,
+            cards: prev.cards.map((c) =>
+              c.id === cardId
+                ? {
+                    ...c,
+                    question: editState.question.trim(),
+                    answer: editState.answer.trim(),
+                    isEditing: false,
+                    isNew: false,
+                  }
+                : c
+            ),
+            editStates: newEditStates,
+            error: null,
+          };
         });
-
-        setError(null);
       } catch {
-        setError("Failed to save card. Please try again.");
+        setState((prev) => ({
+          ...prev,
+          error: "Failed to save card. Please try again.",
+        }));
       }
     },
-    [editStates]
+    [state.editStates]
   );
 
   const deleteCard = useCallback(async (cardId: string) => {
     try {
       // Simulate delete operation
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
-      setCards((prev) => prev.filter((c) => c.id !== cardId));
+      setState((prev) => {
+        const newEditStates = { ...prev.editStates };
+        delete newEditStates[cardId];
 
-      // Clean up edit state and selection
-      setEditStates((prev) => {
-        const newState = { ...prev };
-        delete newState[cardId];
-        return newState;
-      });
+        const newSelectedCards = new Set(prev.selectedCards);
+        newSelectedCards.delete(cardId);
 
-      setSelectedCards((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(cardId);
-        return newSet;
+        return {
+          ...prev,
+          cards: prev.cards.filter((c) => c.id !== cardId),
+          editStates: newEditStates,
+          selectedCards: newSelectedCards,
+        };
       });
     } catch {
-      setError("Failed to delete card. Please try again.");
+      setState((prev) => ({
+        ...prev,
+        error: "Failed to delete card. Please try again.",
+      }));
     }
   }, []);
 
@@ -187,90 +215,245 @@ export function useReviewCards() {
       isNew: true,
     };
 
-    setCards((prev) => [...prev, newCard]);
-    setEditStates((prev) => ({
+    setState((prev) => ({
       ...prev,
-      [newId]: { question: "", answer: "" },
+      cards: [...prev.cards, newCard],
+      editStates: {
+        ...prev.editStates,
+        [newId]: { question: "", answer: "" },
+      },
     }));
   }, []);
 
+  // Card improvement using new API
+  const improveCard = useCallback(
+    async (cardId: string, instruction: string) => {
+      const card = state.cards.find((c) => c.id === cardId);
+      if (!card) return;
+
+      try {
+        setState((prev) => ({
+          ...prev,
+          bulkOperationLoading: true,
+        }));
+
+        const response = await fetch("/api/flashcards/regenerate-card", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            card: {
+              question: card.question,
+              answer: card.answer,
+            },
+            instruction,
+            context: state.sourceText,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to improve card");
+        }
+
+        const { improvedCard } = await response.json();
+
+        setState((prev) => ({
+          ...prev,
+          cards: prev.cards.map((c) =>
+            c.id === cardId
+              ? {
+                  ...c,
+                  question: improvedCard.question,
+                  answer: improvedCard.answer,
+                }
+              : c
+          ),
+          bulkOperationLoading: false,
+        }));
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          error: "Failed to improve card. Please try again.",
+          bulkOperationLoading: false,
+        }));
+      }
+    },
+    [state.cards, state.sourceText]
+  );
+
   // Selection functions
   const toggleCardSelection = useCallback((cardId: string) => {
-    setSelectedCards((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(cardId)) {
-        newSet.delete(cardId);
+    setState((prev) => {
+      const newSelected = new Set(prev.selectedCards);
+      if (newSelected.has(cardId)) {
+        newSelected.delete(cardId);
       } else {
-        newSet.add(cardId);
+        newSelected.add(cardId);
       }
-      return newSet;
+      return { ...prev, selectedCards: newSelected };
     });
   }, []);
 
   const selectAllCards = useCallback(() => {
-    const allCardIds = cards.map((c) => c.id);
-    setSelectedCards(new Set(allCardIds));
-  }, [cards]);
+    setState((prev) => ({
+      ...prev,
+      selectedCards: new Set(prev.cards.map((c) => c.id)),
+    }));
+  }, []);
 
   const clearSelection = useCallback(() => {
-    setSelectedCards(new Set());
+    setState((prev) => ({
+      ...prev,
+      selectedCards: new Set(),
+    }));
   }, []);
 
   // Bulk operations
   const bulkDeleteCards = useCallback(async () => {
-    if (selectedCards.size === 0) return;
+    if (state.selectedCards.size === 0) return;
 
-    setBulkOperationLoading(true);
+    setState((prev) => ({ ...prev, bulkOperationLoading: true }));
+
     try {
-      // Simulate bulk delete
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      setCards((prev) => prev.filter((c) => !selectedCards.has(c.id)));
-      setSelectedCards(new Set());
+      setState((prev) => ({
+        ...prev,
+        cards: prev.cards.filter((c) => !prev.selectedCards.has(c.id)),
+        selectedCards: new Set(),
+        bulkOperationLoading: false,
+      }));
     } catch {
-      setError("Failed to delete selected cards. Please try again.");
-    } finally {
-      setBulkOperationLoading(false);
+      setState((prev) => ({
+        ...prev,
+        error: "Failed to delete selected cards. Please try again.",
+        bulkOperationLoading: false,
+      }));
     }
-  }, [selectedCards]);
+  }, [state.selectedCards]);
 
-  // Save set with progress
-  const handleSaveSet = useCallback(async () => {
-    setIsSaving(true);
-    setSaveProgress(0);
+  const bulkImproveCards = useCallback(
+    async (instruction: string) => {
+      if (state.selectedCards.size === 0) return;
 
-    try {
-      // Simulate save progress
-      const steps = [
-        { progress: 25 },
-        { progress: 50 },
-        { progress: 75 },
-        { progress: 100 },
-      ];
+      setState((prev) => ({ ...prev, bulkOperationLoading: true }));
 
-      for (const step of steps) {
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        setSaveProgress(step.progress);
+      try {
+        const selectedCardData = state.cards
+          .filter((c) => state.selectedCards.has(c.id))
+          .map((c) => ({ question: c.question, answer: c.answer }));
+
+        const response = await fetch("/api/flashcards/improve-set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cards: selectedCardData,
+            instruction,
+            context: state.sourceText,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to improve cards");
+        }
+
+        const { improvedCards } = await response.json();
+
+        setState((prev) => {
+          let improvedIndex = 0;
+
+          return {
+            ...prev,
+            cards: prev.cards.map((c) => {
+              if (
+                prev.selectedCards.has(c.id) &&
+                improvedIndex < improvedCards.length
+              ) {
+                const improved = improvedCards[improvedIndex++];
+                return {
+                  ...c,
+                  question: improved.question,
+                  answer: improved.answer,
+                };
+              }
+              return c;
+            }),
+            selectedCards: new Set(),
+            bulkOperationLoading: false,
+          };
+        });
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          error: "Failed to improve selected cards. Please try again.",
+          bulkOperationLoading: false,
+        }));
       }
+    },
+    [state.selectedCards, state.cards, state.sourceText]
+  );
 
-      // In real implementation, call your API here
-      const setId = `set-${Date.now()}`;
+  // Save flashcard set
+  const handleSaveSet = useCallback(
+    async (setName: string) => {
+      setState((prev) => ({ ...prev, isSaving: true, saveProgress: 0 }));
 
-      router.push(`/sets/${setId}`);
-    } catch {
-      setError("Failed to save flashcard set. Please try again.");
-      setIsSaving(false);
-    }
-  }, [router]);
+      try {
+        // Simulate save progress
+        const steps = [25, 50, 75, 100];
+
+        for (const step of steps) {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          setState((prev) => ({ ...prev, saveProgress: step }));
+        }
+
+        // Call API to save the set
+        const response = await fetch("/api/sets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: setName,
+            cards: state.cards.map(({ question, answer }) => ({
+              question,
+              answer,
+            })),
+            analysis: state.analysis,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save flashcard set");
+        }
+
+        const { setId } = await response.json();
+
+        // Clear session storage
+        CardsSessionStorage.clear();
+
+        // Redirect to the new set
+        router.push(`/sets/${setId}`);
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          error: "Failed to save flashcard set. Please try again.",
+          isSaving: false,
+          saveProgress: 0,
+        }));
+      }
+    },
+    [state.cards, state.analysis, router]
+  );
 
   // Update edit state
   const updateEditState = useCallback(
     (cardId: string, field: "question" | "answer", value: string) => {
-      setEditStates((prev) => ({
+      setState((prev) => ({
         ...prev,
-        [cardId]: {
-          ...prev[cardId],
-          [field]: value,
+        editStates: {
+          ...prev.editStates,
+          [cardId]: {
+            ...prev.editStates[cardId],
+            [field]: value,
+          },
         },
       }));
     },
@@ -279,24 +462,20 @@ export function useReviewCards() {
 
   // Error handling
   const clearError = useCallback(() => {
-    setError(null);
+    setState((prev) => ({ ...prev, error: null }));
   }, []);
-
-  // Auto-load cards on hook initialization
-  useState(() => {
-    loadCards();
-  });
 
   return {
     // State
-    cards,
-    loading,
-    error,
-    selectedCards,
-    editStates,
-    bulkOperationLoading,
-    isSaving,
-    saveProgress,
+    cards: state.cards,
+    loading: state.loading,
+    error: state.error,
+    analysis: state.analysis,
+    selectedCards: state.selectedCards,
+    editStates: state.editStates,
+    bulkOperationLoading: state.bulkOperationLoading,
+    isSaving: state.isSaving,
+    saveProgress: state.saveProgress,
 
     // Card operations
     startEditing,
@@ -304,6 +483,7 @@ export function useReviewCards() {
     saveCard,
     deleteCard,
     addNewCard,
+    improveCard,
     updateEditState,
 
     // Selection operations
@@ -311,14 +491,12 @@ export function useReviewCards() {
     selectAllCards,
     clearSelection,
     bulkDeleteCards,
+    bulkImproveCards,
 
     // Save operations
     handleSaveSet,
 
     // Error handling
     clearError,
-
-    // Manual reload
-    loadCards,
   };
 }

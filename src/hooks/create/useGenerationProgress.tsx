@@ -1,5 +1,11 @@
 import { useState, useCallback } from "react";
-import type { GenerationConfig } from "@/components/create/GenerationSettings";
+import type { ContentAnalysis } from "./useContentAnalysis";
+
+export interface GeneratedCard {
+  id: string;
+  question: string;
+  answer: string;
+}
 
 interface GenerationStage {
   id: string;
@@ -13,50 +19,34 @@ const GENERATION_STAGES: GenerationStage[] = [
   {
     id: "analyzing",
     label: "Analyzing Content",
-    description: "Reading and understanding your material structure",
+    description: "AI is understanding your content structure and key concepts",
     duration: 2000,
-    endProgress: 20,
-  },
-  {
-    id: "extracting",
-    label: "Extracting Key Concepts",
-    description: "Identifying important terms, definitions, and relationships",
-    duration: 3000,
-    endProgress: 45,
+    endProgress: 30,
   },
   {
     id: "generating",
-    label: "Generating Questions",
-    description: "Creating targeted questions based on your content",
+    label: "Creating Flashcards",
+    description: "Generating targeted questions and answers based on analysis",
     duration: 4000,
-    endProgress: 75,
+    endProgress: 90,
   },
   {
-    id: "formatting",
-    label: "Formatting Cards",
-    description: "Finalizing flashcards and preparing for review",
-    duration: 1500,
-    endProgress: 95,
-  },
-  {
-    id: "complete",
-    label: "Complete",
-    description: "Your flashcards are ready!",
-    duration: 500,
+    id: "finalizing",
+    label: "Finalizing",
+    description: "Preparing your flashcards for review",
+    duration: 1000,
     endProgress: 100,
   },
 ];
 
 interface GenerationState {
   isGenerating: boolean;
-  currentStage: number; // index in GENERATION_STAGES
-  progress: number; // 0-100
+  currentStage: number;
+  progress: number;
   error?: string;
   canCancel: boolean;
-  estimatedCards: number;
-  wordsProcessed: number;
-  totalWords: number;
   currentStageDescription: string;
+  generatedCards: GeneratedCard[];
 }
 
 // Easing function for natural progress animation
@@ -69,45 +59,30 @@ export function useGenerationProgress() {
     isGenerating: false,
     currentStage: 0,
     progress: 0,
-    error: undefined,
     canCancel: true,
-    estimatedCards: 0,
-    wordsProcessed: 0,
-    totalWords: 0,
     currentStageDescription: "",
+    generatedCards: [],
   });
 
   const animateProgress = useCallback(
     (
       startProgress: number,
       endProgress: number,
-      duration: number,
-      totalWords: number,
-      stageIndex: number
+      duration: number
     ): Promise<void> => {
       return new Promise((resolve) => {
         const startTime = Date.now();
         const progressDiff = endProgress - startProgress;
-        const currentStage = GENERATION_STAGES[stageIndex];
 
         const updateProgress = () => {
           const elapsed = Date.now() - startTime;
           const progressRatio = Math.min(elapsed / duration, 1);
-
-          // Use easing function for more natural progress
           const easedProgress = easeOutCubic(progressRatio);
           const currentProgress = startProgress + progressDiff * easedProgress;
-
-          // Simulate words processed
-          const wordsProcessed = Math.floor(
-            (totalWords * currentProgress) / 100
-          );
 
           setState((prev) => ({
             ...prev,
             progress: currentProgress,
-            wordsProcessed,
-            currentStageDescription: currentStage.description,
           }));
 
           if (progressRatio < 1) {
@@ -123,135 +98,117 @@ export function useGenerationProgress() {
     []
   );
 
-  const runGenerationStages = useCallback(
+  const generateFlashcards = useCallback(
     async (
       text: string,
-      config: GenerationConfig,
-      estimatedCards: number,
-      totalWords: number
-    ) => {
-      try {
-        // Run through each stage with realistic progress
-        for (
-          let stageIndex = 0;
-          stageIndex < GENERATION_STAGES.length - 1;
-          stageIndex++
-        ) {
-          const stage = GENERATION_STAGES[stageIndex];
-          const nextStage = GENERATION_STAGES[stageIndex + 1];
-
-          // Update current stage
-          setState((prev) => ({
-            ...prev,
-            currentStage: stageIndex,
-            currentStageDescription: stage.description,
-          }));
-
-          // For the generating stage (index 2), make the actual API call
-          if (stageIndex === 2) {
-            // Start the progress animation
-            const progressPromise = animateProgress(
-              stage.endProgress,
-              nextStage.endProgress,
-              stage.duration,
-              totalWords,
-              stageIndex
-            );
-
-            // Make API call concurrently
-            const apiPromise = fetch("/api/flashcards/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text }),
-            });
-
-            // Wait for both to complete
-            const [, response] = await Promise.all([
-              progressPromise,
-              apiPromise,
-            ]);
-
-            if (!response.ok) {
-              throw new Error("Failed to generate flashcards");
-            }
-
-            const { cards } = await response.json();
-
-            // Update estimated cards with actual count
-            setState((prev) => ({
-              ...prev,
-              estimatedCards: cards.length,
-            }));
-
-            // Continue to next stage
-            continue;
-          }
-
-          // Animate progress for other stages
-          await animateProgress(
-            stage.endProgress,
-            nextStage.endProgress,
-            stage.duration,
-            totalWords,
-            stageIndex
-          );
-        }
-
-        // Final completion stage
-        setState((prev) => ({
-          ...prev,
-          currentStage: GENERATION_STAGES.length - 1,
-          progress: 100,
-          isGenerating: false,
-          currentStageDescription:
-            GENERATION_STAGES[GENERATION_STAGES.length - 1].description,
-        }));
-
-        // Return the generated cards (we'll need to store them during the API call)
-        const response = await fetch("/api/flashcards/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to generate flashcards");
-        }
-
-        const { cards } = await response.json();
-        return cards;
-      } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          isGenerating: false,
-          error: error instanceof Error ? error.message : "Generation failed",
-        }));
-        throw error;
-      }
-    },
-    [animateProgress]
-  );
-
-  const startGeneration = useCallback(
-    async (text: string, config: GenerationConfig) => {
-      const words = text.split(/\s+/).filter((word) => word.length > 0);
-      const estimatedCards = Math.max(1, Math.floor(words.length / 50));
-
+      analysis: ContentAnalysis
+    ): Promise<GeneratedCard[]> => {
       setState({
         isGenerating: true,
         currentStage: 0,
         progress: 0,
-        error: undefined,
         canCancel: true,
-        estimatedCards,
-        wordsProcessed: 0,
-        totalWords: words.length,
         currentStageDescription: GENERATION_STAGES[0].description,
+        generatedCards: [],
+        error: undefined,
       });
 
-      return runGenerationStages(text, config, estimatedCards, words.length);
+      try {
+        // Stage 1: Show analysis stage (using existing analysis)
+        setState((prev) => ({
+          ...prev,
+          currentStageDescription: GENERATION_STAGES[0].description,
+        }));
+
+        await animateProgress(
+          0,
+          GENERATION_STAGES[0].endProgress,
+          GENERATION_STAGES[0].duration
+        );
+
+        // Stage 2: Actually generate cards
+        setState((prev) => ({
+          ...prev,
+          currentStage: 1,
+          currentStageDescription: GENERATION_STAGES[1].description,
+        }));
+
+        // Start progress animation and API call concurrently
+        const progressPromise = animateProgress(
+          GENERATION_STAGES[0].endProgress,
+          GENERATION_STAGES[1].endProgress,
+          GENERATION_STAGES[1].duration
+        );
+
+        const apiPromise = fetch("/api/flashcards/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            analysis, // Pass the analysis to help generation
+          }),
+        });
+
+        const [, response] = await Promise.all([progressPromise, apiPromise]);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to generate flashcards");
+        }
+
+        interface ApiCardResponse {
+          id?: string;
+          question: string;
+          answer: string;
+        }
+
+        const { cards } = await response.json();
+
+        // Convert API response to our format
+        const generatedCards: GeneratedCard[] = cards.map(
+          (card: ApiCardResponse, index: number) => ({
+            id: card.id || `generated-${Date.now()}-${index}`,
+            question: card.question,
+            answer: card.answer,
+          })
+        );
+
+        // Stage 3: Finalization
+        setState((prev) => ({
+          ...prev,
+          currentStage: 2,
+          currentStageDescription: GENERATION_STAGES[2].description,
+          generatedCards,
+        }));
+
+        await animateProgress(
+          GENERATION_STAGES[1].endProgress,
+          GENERATION_STAGES[2].endProgress,
+          GENERATION_STAGES[2].duration
+        );
+
+        // Complete
+        setState((prev) => ({
+          ...prev,
+          isGenerating: false,
+          progress: 100,
+        }));
+
+        return generatedCards;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Generation failed";
+
+        setState((prev) => ({
+          ...prev,
+          isGenerating: false,
+          error: errorMessage,
+        }));
+
+        throw error;
+      }
     },
-    [runGenerationStages]
+    [animateProgress]
   );
 
   const cancelGeneration = useCallback(() => {
@@ -263,9 +220,14 @@ export function useGenerationProgress() {
     }));
   }, []);
 
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: undefined }));
+  }, []);
+
   return {
     state,
-    startGeneration,
+    generateFlashcards,
     cancelGeneration,
+    clearError,
   };
 }
