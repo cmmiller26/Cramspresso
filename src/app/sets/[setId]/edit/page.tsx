@@ -2,20 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Edit } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SetEditor } from "@/components/sets/SetEditor";
 import { UploadZone } from "@/components/shared/UploadZone";
-import { Flashcard } from "@/lib/flashcards";
-import {
-  appendCardsToSet,
-  updateCardInSet,
-  deleteCardFromSet,
-  updateSetName,
-  generateFromUrls,
-} from "@/lib/flashcardApi";
-import { ArrowLeft, Edit } from "lucide-react";
+import type { Flashcard } from "@/lib/types/flashcards";
+import * as setsApi from "@/lib/api/sets";
 
 interface SetData {
   id: string;
@@ -78,7 +72,7 @@ export default function SetEditorPage() {
 
   const handleAddCard = async (newCard: Omit<Flashcard, "id">) => {
     // Cast to Flashcard since appendCardsToSet can handle cards without IDs
-    await appendCardsToSet(setId, [newCard as Flashcard]);
+    await setsApi.addCardsToSet(setId, [newCard as Flashcard]);
     await loadSet(); // Refresh the data
   };
 
@@ -86,7 +80,7 @@ export default function SetEditorPage() {
     cardId: string,
     updates: { question: string; answer: string }
   ) => {
-    await updateCardInSet(setId, cardId, updates);
+    await setsApi.updateCard(setId, cardId, updates);
     // Update local state instead of refetching to preserve order
     setSetData((prev) =>
       prev
@@ -101,7 +95,7 @@ export default function SetEditorPage() {
   };
 
   const handleDeleteCard = async (cardId: string) => {
-    await deleteCardFromSet(setId, cardId);
+    await setsApi.deleteCard(setId, cardId);
     // Update local state instead of refetching
     setSetData((prev) =>
       prev
@@ -114,9 +108,13 @@ export default function SetEditorPage() {
   };
 
   const handleUploadComplete = async (files: { ufsUrl: string }[]) => {
+    console.log("Files uploaded:", files);
     try {
+      // TODO: Implement actual file processing and card generation
+      throw new Error("File upload handling not implemented yet");
+
+      /**
       const urls = files.map((f) => f.ufsUrl);
-      const newCards = await generateFromUrls(urls);
       if (newCards.length === 0) {
         alert(
           "No flashcards generated. Please try again with different files."
@@ -125,6 +123,7 @@ export default function SetEditorPage() {
       }
       await appendCardsToSet(setId, newCards);
       await loadSet(); // Refresh to get new cards with IDs
+      */
     } catch (error) {
       console.error("Error uploading and generating cards:", error);
       alert("Failed to generate cards from upload. Please try again.");
@@ -139,7 +138,7 @@ export default function SetEditorPage() {
 
     setUpdatingName(true);
     try {
-      await updateSetName(setId, editingName.trim());
+      await setsApi.updateSetName(setId, editingName.trim());
       await loadSet(); // Refresh the data
       setIsEditingName(false);
     } catch (error) {

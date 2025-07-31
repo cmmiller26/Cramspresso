@@ -2,7 +2,7 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import type { StudySession, StudyRound } from "@/lib/flashcards";
+import type { StudySession, StudyRound } from "@/lib/types/flashcards";
 
 interface StudyProgressProps {
   studySession: StudySession;
@@ -17,11 +17,13 @@ export function StudyProgress({
   // This shows accurate progress: 0% at start, advances after completing cards
   const currentProgress = currentRound.currentIndex; // Current position (0-based)
   const totalCards = currentRound.totalCards;
-  const progressPercentage = totalCards > 0 ? (currentProgress / totalCards) * 100 : 0;
-  
+  const progressPercentage =
+    totalCards > 0 ? (currentProgress / totalCards) * 100 : 0;
+
   // Use studiedCards.length for the "completed" count since that's accurate
   const completedCards = currentRound.studiedCards.length;
-  const studiedPercentage = totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
+  const studiedPercentage =
+    totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
 
   return (
     <Card>
@@ -30,7 +32,8 @@ export function StudyProgress({
           {/* Current round progress */}
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-foreground">
-              Round {currentRound.roundNumber}: Card {currentRound.currentIndex + 1} of {currentRound.totalCards}
+              Round {currentRound.roundNumber}: Card{" "}
+              {currentRound.currentIndex + 1} of {currentRound.totalCards}
             </span>
             <span className="text-sm text-muted-foreground">
               {completedCards} completed
@@ -58,7 +61,9 @@ export function StudyProgress({
               <div className="flex justify-between">
                 <span>Cards answered:</span>
                 <span>
-                  {studySession.totalCardsStudied} ({studySession.totalCorrectAnswers} correct, {studySession.totalIncorrectAnswers} incorrect)
+                  {studySession.totalCardsStudied} (
+                  {studySession.totalCorrectAnswers} correct,{" "}
+                  {studySession.totalIncorrectAnswers} incorrect)
                 </span>
               </div>
               <div className="flex justify-between">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Flashcard } from "@/lib/flashcards";
+import { Flashcard } from "@/lib/types/flashcards";
 import { Search } from "lucide-react";
 
 interface Props {
