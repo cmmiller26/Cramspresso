@@ -4,12 +4,14 @@ import type { AnalyzeContentResponse } from "@/lib/types/api";
  * Analyze content using AI to determine optimal flashcard generation strategy
  */
 export async function analyzeContent(
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<AnalyzeContentResponse> {
   const response = await fetch("/api/content/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
+    signal, // Add abort signal support
   });
 
   if (!response.ok) {

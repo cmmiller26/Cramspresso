@@ -1,15 +1,6 @@
 import { useState, useCallback } from "react";
-
-export interface ContentAnalysis {
-  contentType: "vocabulary" | "concepts" | "mixed" | "other";
-  confidence: number;
-  summary: string;
-  keyTopics: string[];
-  vocabularyTerms: Array<{ term: string; definition?: string }>;
-  estimatedCards: number;
-  suggestedFocus: string[];
-  reasoning: string;
-}
+import * as contentApi from "@/lib/api/content";
+import type { ContentAnalysis } from "@/lib/types/api";
 
 interface AnalysisState {
   isAnalyzing: boolean;
@@ -33,28 +24,15 @@ export function useContentAnalysis() {
       }));
 
       try {
-        const response = await fetch("/api/content/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || `Analysis failed (${response.status})`
-          );
-        }
-
-        const { analysis } = await response.json();
+        const response = await contentApi.analyzeContent(text);
 
         setState((prev) => ({
           ...prev,
-          analysis,
+          analysis: response.analysis,
           isAnalyzing: false,
         }));
 
-        return analysis;
+        return response.analysis;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to analyze content";

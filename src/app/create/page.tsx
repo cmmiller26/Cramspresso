@@ -5,30 +5,28 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LoadingButton } from "@/components/shared/LoadingButton";
+import {
+  GenerationError,
+  CancellationSuccess,
+} from "@/components/shared/ErrorStates";
+
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { FileUploader } from "@/components/create/FileUploader";
 import {
   Upload,
   Brain,
   CheckCircle,
-  AlertCircle,
   ArrowLeft,
   Zap,
   FileText,
-  Target,
 } from "lucide-react";
 import { useContentAnalysis } from "@/hooks/create/useContentAnalysis";
 import { useGenerationProgress } from "@/hooks/create/useGenerationProgress";
-import { CardsSessionStorage } from "@/lib/CardsSessionStorage";
+import { CardsSessionStorage } from "@/lib/storage/CardsSessionStorage";
+import { extractTextFromFile } from "@/lib/api/content";
+import type { ContentAnalysis } from "@/lib/types/api";
 
-type FlowStep =
-  | "upload"
-  | "analyzing"
-  | "analysis-complete"
-  | "generating"
-  | "complete";
+type FlowStep = "upload" | "generating" | "complete";
 
 interface CreateState {
   step: FlowStep;
@@ -38,17 +36,16 @@ interface CreateState {
   source: "file" | "text";
   isExtracting: boolean;
   error?: string;
+  successMessage?: string;
+  cancelledFileUrls?: Set<string>; // Track cancelled file URLs
+  lastAnalysis?: ContentAnalysis; // Store analysis for retrying
 }
 
 export default function CreatePage() {
   const router = useRouter();
 
-  const {
-    analysis,
-    error: analysisError,
-    analyzeContent,
-    clearError: clearAnalysisError,
-  } = useContentAnalysis();
+  const { error: analysisError, clearError: clearAnalysisError } =
+    useContentAnalysis();
 
   const {
     state: generationState,
@@ -61,10 +58,19 @@ export default function CreatePage() {
     extractedText: "",
     source: "file",
     isExtracting: false,
+    cancelledFileUrls: new Set(),
   });
 
   // Handle file upload completion
   const handleFileUploaded = async (url: string, fileName: string) => {
+    console.log("📁 handleFileUploaded called for:", fileName, "URL:", url);
+
+    // Check if this file URL was cancelled
+    if (state.cancelledFileUrls?.has(url)) {
+      console.log("🚫 File upload was cancelled - ignoring:", url);
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
       fileName,
@@ -75,17 +81,26 @@ export default function CreatePage() {
     }));
 
     try {
-      const response = await fetch("/api/flashcards/extract-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to extract text from file");
+      // Check again before text extraction in case cancellation happened during state update
+      if (state.cancelledFileUrls?.has(url)) {
+        console.log(
+          "🚫 File upload cancelled during extraction setup - ignoring:",
+          url
+        );
+        return;
       }
 
-      const { text } = await response.json();
+      // Use centralized API function
+      const text = await extractTextFromFile(url);
+
+      // Check one more time before proceeding to generation
+      if (state.cancelledFileUrls?.has(url)) {
+        console.log(
+          "🚫 File upload cancelled after extraction - ignoring:",
+          url
+        );
+        return;
+      }
 
       setState((prev) => ({
         ...prev,
@@ -93,9 +108,18 @@ export default function CreatePage() {
         isExtracting: false,
       }));
 
-      // Automatically start analysis
-      await handleAnalyzeContent(text);
+      // Automatically start generation (which includes analysis)
+      await handleGenerateCards(text);
     } catch (error) {
+      // Don't show error if upload was cancelled
+      if (state.cancelledFileUrls?.has(url)) {
+        console.log(
+          "🚫 File upload cancelled during error handling - ignoring:",
+          url
+        );
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         error:
@@ -115,35 +139,29 @@ export default function CreatePage() {
       error: undefined,
     }));
 
-    // Automatically start analysis
-    await handleAnalyzeContent(text);
+    // Automatically start generation (which includes analysis)
+    await handleGenerateCards(text);
   };
 
-  const handleAnalyzeContent = async (text: string) => {
-    setState((prev) => ({ ...prev, step: "analyzing" }));
+  const handleGenerateCards = async (
+    text: string,
+    analysisToReuse?: ContentAnalysis
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      step: "generating",
+      error: undefined, // Clear any previous errors
+    }));
 
     try {
-      await analyzeContent(text);
-      setState((prev) => ({ ...prev, step: "analysis-complete" }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        step: "upload",
-        error: error instanceof Error ? error.message : "Analysis failed",
-      }));
-    }
-  };
+      // Generate cards (includes analysis step now or reuses existing analysis)
+      const result = await generateFlashcards(text, analysisToReuse);
 
-  const handleGenerateCards = async () => {
-    if (!analysis || !state.extractedText) return;
+      // Store the analysis for potential retries
+      setState((prev) => ({ ...prev, lastAnalysis: result.analysis }));
 
-    setState((prev) => ({ ...prev, step: "generating" }));
-
-    try {
-      const cards = await generateFlashcards(state.extractedText, analysis);
-
-      // Save to session storage for review page
-      CardsSessionStorage.save(cards, analysis, state.extractedText);
+      // Save to session storage for review page with analysis
+      CardsSessionStorage.save(result.cards, result.analysis, text);
 
       setState((prev) => ({ ...prev, step: "complete" }));
 
@@ -152,12 +170,32 @@ export default function CreatePage() {
         router.push("/create/review");
       }, 2000);
     } catch (error) {
+      // Handle cancellation gracefully - show success message
+      if (error instanceof Error && error.name === "CancellationError") {
+        console.log("🔄 Generation was cancelled, returning to upload");
+        setState((prev) => ({
+          ...prev,
+          step: "upload",
+          error: undefined,
+          successMessage:
+            "Generation cancelled successfully. You can start over with new content.",
+        }));
+        return;
+      }
+
+      // For other errors, stay on generation screen to allow retry
+      console.error("❌ Generation error:", error);
       setState((prev) => ({
         ...prev,
-        step: "analysis-complete",
+        // Stay on generating step instead of going back to upload
         error: error instanceof Error ? error.message : "Generation failed",
       }));
     }
+  };
+
+  const handleRetryGeneration = () => {
+    // Retry using the same text and analysis if available
+    handleGenerateCards(state.extractedText, state.lastAnalysis);
   };
 
   const handleStartOver = () => {
@@ -166,14 +204,27 @@ export default function CreatePage() {
       extractedText: "",
       source: "file",
       isExtracting: false,
+      error: undefined,
+      successMessage: undefined,
+      lastAnalysis: undefined,
+      cancelledFileUrls: new Set(),
     });
     clearAnalysisError();
     CardsSessionStorage.clear();
   };
 
-  const handleClearError = () => {
-    setState((prev) => ({ ...prev, error: undefined }));
-    clearAnalysisError();
+  const handleClearSuccess = () => {
+    setState((prev) => ({ ...prev, successMessage: undefined }));
+  };
+
+  const handleUploadCancelled = (fileUrl?: string) => {
+    console.log("🚫 Upload cancelled callback - File URL:", fileUrl);
+    if (fileUrl) {
+      setState((prev) => ({
+        ...prev,
+        cancelledFileUrls: new Set(prev.cancelledFileUrls).add(fileUrl),
+      }));
+    }
   };
 
   // Render different states
@@ -185,6 +236,7 @@ export default function CreatePage() {
             <FileUploader
               onFileUploaded={handleFileUploaded}
               onTextInput={handleTextInput}
+              onUploadCancelled={handleUploadCancelled}
               isExtracting={state.isExtracting}
             />
 
@@ -219,156 +271,59 @@ export default function CreatePage() {
           </div>
         );
 
-      case "analyzing":
-        return (
-          <Card className="bg-card border-border">
-            <CardContent className="p-8">
-              <div className="space-y-6">
-                <div className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                    <Brain className="w-8 h-8 text-primary animate-pulse" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    🤖 AI is analyzing your content...
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Understanding structure, key concepts, and optimal question
-                    types
-                  </p>
-                </div>
-
-                <LoadingSpinner size="lg" className="py-4" />
-
-                <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
-                  <p className="text-sm text-muted-foreground text-center">
-                    ⚡ This usually takes 10-30 seconds depending on content
-                    length
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case "analysis-complete":
-        if (!analysis) return null;
-
-        return (
-          <div className="space-y-6">
-            {/* Analysis Results */}
-            <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-green-800 dark:text-green-200">
-                      ✅ Content Analysis Complete
-                    </CardTitle>
-                    <p className="text-green-600 dark:text-green-400 text-sm">
-                      {analysis.summary}
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Analysis Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                      <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                        {analysis.estimatedCards}
-                      </div>
-                      <div className="text-sm text-green-600 dark:text-green-400">
-                        Flashcards
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                      <div className="text-2xl font-bold text-green-800 dark:text-green-200 capitalize">
-                        {analysis.contentType}
-                      </div>
-                      <div className="text-sm text-green-600 dark:text-green-400">
-                        Content Type
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                      <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                        {Math.round(analysis.confidence * 100)}%
-                      </div>
-                      <div className="text-sm text-green-600 dark:text-green-400">
-                        Confidence
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* AI Reasoning */}
-                  <div className="bg-green-100 dark:bg-green-900 rounded-lg p-4">
-                    <h4 className="font-medium text-green-800 dark:text-green-200 mb-2 flex items-center gap-2">
-                      <Target className="w-4 h-4" />
-                      AI Strategy
-                    </h4>
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      {analysis.reasoning}
-                    </p>
-                  </div>
-
-                  {/* Key Topics */}
-                  {analysis.keyTopics.length > 0 && (
-                    <div>
-                      <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
-                        Key Topics Identified:
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.keyTopics.map((topic, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 rounded-md text-xs"
-                          >
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Generate Button */}
-            <div className="text-center">
-              <LoadingButton
-                onClick={handleGenerateCards}
-                loading={generationState.isGenerating}
-                loadingText="Generating..."
-                size="lg"
-                className="min-w-[200px]"
-              >
-                <Zap className="w-5 h-5 mr-2" />
-                Generate {analysis.estimatedCards} Flashcards
-              </LoadingButton>
-            </div>
-          </div>
-        );
-
       case "generating":
         return (
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="space-y-6">
+                {/* Error Display - Show on generation screen */}
+                {state.error && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-destructive">⚠️</div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-destructive mb-2">
+                          Generation Failed
+                        </h4>
+                        <p className="text-sm text-destructive mb-4">
+                          {state.error}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRetryGeneration}
+                            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                          >
+                            Try Again
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleStartOver}
+                            className="text-muted-foreground"
+                          >
+                            Start Over
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Brain className="w-6 h-6 text-primary animate-pulse" />
                     <h3 className="font-semibold text-foreground">
-                      Generating Flashcards
+                      Creating Your Flashcards
                     </h3>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-sm text-muted-foreground">
                       {Math.round(generationState.progress)}% complete
                     </div>
-                    {generationState.canCancel && (
+                    {generationState.canCancel && !state.error && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -380,39 +335,32 @@ export default function CreatePage() {
                   </div>
                 </div>
 
-                {/* Progress */}
-                <div className="space-y-2">
-                  <Progress value={generationState.progress} className="h-3" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    {generationState.currentStageDescription}
-                  </p>
-                </div>
+                {/* Progress - Hide when there's an error */}
+                {!state.error && (
+                  <>
+                    {/* Progress Bar and Current Stage */}
+                    <div className="space-y-4">
+                      <Progress
+                        value={generationState.progress}
+                        className="h-3"
+                      />
 
-                {/* Current Stage */}
-                <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <LoadingSpinner size="sm" className="mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      {generationState.currentStageDescription}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Creating high-quality, targeted flashcards optimized for
-                      your learning
-                    </p>
-                  </div>
-                </div>
-
-                {/* AI Tips */}
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-foreground mb-2">
-                    🤖 What&apos;s Happening
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    Our AI is crafting questions that test comprehension,
-                    recall, and application based on your content&apos;s unique
-                    structure and key concepts.
-                  </p>
-                </div>
+                      {/* Single, Clear Current Stage Display */}
+                      <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                        <LoadingSpinner size="sm" className="mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground mb-2">
+                            {generationState.currentStageDescription}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            AI is analyzing your content and creating targeted
+                            flashcards optimized for effective learning
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -420,23 +368,25 @@ export default function CreatePage() {
 
       case "complete":
         return (
-          <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-              </div>
-              <CardTitle className="text-green-800 dark:text-green-200">
-                🎉 Flashcards Generated Successfully!
-              </CardTitle>
-              <p className="text-green-600 dark:text-green-400">
-                {generationState.generatedCards.length} flashcards created and
-                ready for review
-              </p>
-            </CardHeader>
-            <CardContent className="text-center">
-              <LoadingSpinner size="sm" text="Redirecting to review..." />
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+              <CardHeader className="text-center">
+                <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                </div>
+                <CardTitle className="text-green-800 dark:text-green-200">
+                  🎉 Flashcards Generated Successfully!
+                </CardTitle>
+                <p className="text-green-600 dark:text-green-400">
+                  {generationState.generatedCards.length} flashcards created and
+                  ready for review
+                </p>
+              </CardHeader>
+              <CardContent className="text-center">
+                <LoadingSpinner size="sm" text="Redirecting to review..." />
+              </CardContent>
+            </Card>
+          </div>
         );
 
       default:
@@ -465,20 +415,14 @@ export default function CreatePage() {
         </p>
       </div>
 
-      {/* Progress Indicator */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Progress Indicator - Updated to 3 steps */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {[
           {
             step: "upload",
             icon: Upload,
             label: "Upload",
             active: state.step === "upload",
-          },
-          {
-            step: "analyzing",
-            icon: Brain,
-            label: "AI Analysis",
-            active: ["analyzing", "analysis-complete"].includes(state.step),
           },
           {
             step: "generating",
@@ -519,22 +463,29 @@ export default function CreatePage() {
         ))}
       </div>
 
-      {/* Error Display */}
-      {(state.error || analysisError) && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{state.error || analysisError}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearError}
-              className="ml-2 h-auto p-0 text-destructive hover:text-destructive"
-            >
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
+      {/* Success Message Display */}
+      {state.successMessage && (
+        <div className="mb-6">
+          <CancellationSuccess
+            message={state.successMessage}
+            onClear={handleClearSuccess}
+          />
+        </div>
+      )}
+
+      {/* Error Display - Only show on upload screen, not generating screen */}
+      {(state.error || analysisError) && state.step === "upload" && (
+        <div className="mb-6">
+          <GenerationError
+            error={state.error || analysisError || ""}
+            onRetry={
+              state.error
+                ? () => handleGenerateCards(state.extractedText)
+                : undefined
+            }
+            onStartOver={handleStartOver}
+          />
+        </div>
       )}
 
       {/* Main Content */}
