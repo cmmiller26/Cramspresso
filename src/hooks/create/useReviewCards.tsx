@@ -1,7 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CardsSessionStorage } from "@/lib/CardsSessionStorage";
-import type { ContentAnalysis } from "./useContentAnalysis";
+import { CardsSessionStorage } from "@/lib/storage/CardsSessionStorage";
+import { useCardRefinement } from "./useCardRefinement";
+import { useBulkImprovements } from "./useBulkImprovements";
+import { useAISuggestions } from "./useAISuggestions";
+import type { ContentAnalysis } from "@/lib/types/api";
+import type { AISuggestion } from "./useAISuggestions";
 
 export interface Flashcard {
   id: string;
@@ -24,7 +28,6 @@ interface ReviewCardsState {
   sourceText: string;
   editStates: Record<string, EditState>;
   selectedCards: Set<string>;
-  bulkOperationLoading: boolean;
   isSaving: boolean;
   saveProgress: number;
 }
@@ -40,10 +43,17 @@ export function useReviewCards() {
     sourceText: "",
     editStates: {},
     selectedCards: new Set(),
-    bulkOperationLoading: false,
     isSaving: false,
     saveProgress: 0,
   });
+
+  // Initialize refinement hooks
+  const cardRefinement = useCardRefinement();
+  const bulkImprovements = useBulkImprovements();
+  const aiSuggestions = useAISuggestions(
+    state.cards.map((c) => ({ question: c.question, answer: c.answer })),
+    state.analysis
+  );
 
   // Load cards from session storage on mount
   useEffect(() => {
@@ -65,7 +75,7 @@ export function useReviewCards() {
 
         // Convert session cards to review format
         const cards: Flashcard[] = sessionData.cards.map((card) => ({
-          id: card.id,
+          id: card.id || `card-${Date.now()}-${Math.random()}`,
           question: card.question,
           answer: card.answer,
           isEditing: false,
@@ -225,36 +235,55 @@ export function useReviewCards() {
     }));
   }, []);
 
-  // Card improvement using new API
-  const improveCard = useCallback(
+  // FIXED: Card refinement with proper error handling and logging
+  const handleCardRefinement = useCallback(
     async (cardId: string, instruction: string) => {
-      const card = state.cards.find((c) => c.id === cardId);
-      if (!card) return;
+      console.log("🔍 DEBUG: Starting card refinement", {
+        cardId,
+        instruction,
+      });
 
-      try {
+      const card = state.cards.find((c) => c.id === cardId);
+      if (!card) {
+        console.error("❌ DEBUG: Card not found", {
+          cardId,
+          availableCards: state.cards.map((c) => c.id),
+        });
+        setState((prev) => ({ ...prev, error: "Card not found" }));
+        return;
+      }
+
+      console.log("✅ DEBUG: Card found", { card });
+
+      // Validate card data before passing to API
+      if (!card.question?.trim() || !card.answer?.trim()) {
+        console.error("❌ DEBUG: Invalid card data", { card });
         setState((prev) => ({
           ...prev,
-          bulkOperationLoading: true,
+          error: "Card is missing question or answer content",
         }));
+        return;
+      }
 
-        const response = await fetch("/api/flashcards/regenerate-card", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            card: {
-              question: card.question,
-              answer: card.answer,
-            },
-            instruction,
-            context: state.sourceText,
-          }),
+      try {
+        console.log("📡 DEBUG: Calling regenerateCard with:", {
+          cardId,
+          originalCard: { question: card.question, answer: card.answer },
+          instruction,
+          context: state.sourceText?.substring(0, 100) + "...",
+          contentType: state.analysis?.contentType,
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to improve card");
-        }
+        // FIXED: Call with correct signature and parameters
+        const improvedCard = await cardRefinement.regenerateCard(
+          cardId,
+          { question: card.question, answer: card.answer },
+          instruction,
+          state.sourceText,
+          state.analysis?.contentType
+        );
 
-        const { improvedCard } = await response.json();
+        console.log("✅ DEBUG: Card regeneration successful", { improvedCard });
 
         setState((prev) => ({
           ...prev,
@@ -267,51 +296,354 @@ export function useReviewCards() {
                 }
               : c
           ),
-          bulkOperationLoading: false,
+          error: null, // Clear any previous errors
         }));
-      } catch {
+      } catch (error) {
+        console.error("❌ DEBUG: Card refinement failed", error);
         setState((prev) => ({
           ...prev,
-          error: "Failed to improve card. Please try again.",
-          bulkOperationLoading: false,
+          error:
+            error instanceof Error ? error.message : "Failed to improve card",
         }));
       }
     },
-    [state.cards, state.sourceText]
+    [state.cards, state.sourceText, state.analysis, cardRefinement]
   );
 
   // Selection functions
   const toggleCardSelection = useCallback((cardId: string) => {
+    console.log("🔍 DEBUG: Toggling card selection", { cardId });
+
     setState((prev) => {
       const newSelected = new Set(prev.selectedCards);
-      if (newSelected.has(cardId)) {
+      const wasSelected = newSelected.has(cardId);
+
+      if (wasSelected) {
         newSelected.delete(cardId);
+        console.log("➖ DEBUG: Card deselected", {
+          cardId,
+          newSize: newSelected.size,
+        });
       } else {
         newSelected.add(cardId);
+        console.log("➕ DEBUG: Card selected", {
+          cardId,
+          newSize: newSelected.size,
+        });
       }
+
+      console.log("📋 DEBUG: Selection state updated", {
+        selectedCards: Array.from(newSelected),
+        totalSelected: newSelected.size,
+      });
+
       return { ...prev, selectedCards: newSelected };
     });
   }, []);
 
   const selectAllCards = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      selectedCards: new Set(prev.cards.map((c) => c.id)),
-    }));
-  }, []);
+    console.log("🔍 DEBUG: Selecting all cards", {
+      totalCards: state.cards.length,
+    });
+
+    setState((prev) => {
+      const allCardIds = prev.cards.map((c) => c.id);
+      console.log("✅ DEBUG: All cards selected", { cardIds: allCardIds });
+
+      return {
+        ...prev,
+        selectedCards: new Set(allCardIds),
+      };
+    });
+  }, [state.cards]);
 
   const clearSelection = useCallback(() => {
+    console.log("🔍 DEBUG: Clearing selection", {
+      currentSize: state.selectedCards.size,
+    });
+
     setState((prev) => ({
       ...prev,
       selectedCards: new Set(),
     }));
-  }, []);
+  }, [state.selectedCards.size]);
 
-  // Bulk operations
+  // FIXED: Bulk operations with proper validation and logging
+  const handleBulkImprovements = useCallback(
+    async (
+      improvement: string,
+      customInstruction?: string,
+      targetCardCount?: number
+    ) => {
+      console.log("🔍 DEBUG: Starting bulk improvements", {
+        improvement,
+        selectedCardsSize: state.selectedCards.size,
+        selectedCardIds: Array.from(state.selectedCards),
+        totalCards: state.cards.length,
+        customInstruction,
+        targetCardCount,
+      });
+
+      // FIXED: Better validation logic
+      const isAddMoreCards = improvement === "add_more_cards";
+
+      if (!isAddMoreCards && state.selectedCards.size === 0) {
+        console.error("❌ DEBUG: No cards selected for non-add operation");
+        setState((prev) => ({
+          ...prev,
+          error:
+            "Please select cards to improve first. Use the checkboxes next to each card.",
+        }));
+        return;
+      }
+
+      try {
+        let selectedCardData;
+
+        if (isAddMoreCards) {
+          // For adding cards, use all cards as context
+          selectedCardData = state.cards.map((c) => ({
+            id: c.id,
+            question: c.question,
+            answer: c.answer,
+          }));
+          console.log("📋 DEBUG: Using all cards for add_more_cards", {
+            count: selectedCardData.length,
+          });
+        } else {
+          // For other improvements, use selected cards
+          selectedCardData = state.cards
+            .filter((c) => {
+              const isSelected = state.selectedCards.has(c.id);
+              console.log(`📝 DEBUG: Card ${c.id} selected: ${isSelected}`);
+              return isSelected;
+            })
+            .map((c) => ({
+              id: c.id,
+              question: c.question,
+              answer: c.answer,
+            }));
+
+          console.log("📋 DEBUG: Selected cards for improvement", {
+            count: selectedCardData.length,
+            cards: selectedCardData.map((c) => ({
+              id: c.id,
+              questionStart: c.question.substring(0, 30) + "...",
+            })),
+          });
+
+          // Double-check we have selected cards
+          if (selectedCardData.length === 0) {
+            console.error(
+              "❌ DEBUG: No cards in selectedCardData after filtering"
+            );
+            setState((prev) => ({
+              ...prev,
+              error:
+                "Selected cards could not be processed. Please try reselecting cards.",
+            }));
+            return;
+          }
+        }
+
+        console.log("📡 DEBUG: Calling bulkImprovements.improveCards with:", {
+          cardsCount: selectedCardData.length,
+          improvement,
+          customInstruction,
+          contextLength: state.sourceText?.length || 0,
+          contentType: state.analysis?.contentType,
+          targetCardCount,
+        });
+
+        const improvedCards = await bulkImprovements.improveCards(
+          selectedCardData,
+          improvement,
+          customInstruction,
+          state.sourceText,
+          state.analysis?.contentType,
+          targetCardCount
+        );
+
+        console.log("✅ DEBUG: Bulk improvement successful", {
+          improvedCount: improvedCards.length,
+          originalCount: selectedCardData.length,
+        });
+
+        setState((prev) => {
+          let improvedIndex = 0;
+          const newCards = [...prev.cards];
+
+          // Handle "add_more_cards" case
+          if (
+            isAddMoreCards &&
+            improvedCards.length > selectedCardData.length
+          ) {
+            // Add new cards
+            const newCardsToAdd = improvedCards.slice(selectedCardData.length);
+            console.log("➕ DEBUG: Adding new cards", {
+              count: newCardsToAdd.length,
+            });
+
+            newCardsToAdd.forEach((newCard) => {
+              newCards.push({
+                id: newCard.id || `bulk-new-${Date.now()}-${Math.random()}`,
+                question: newCard.question,
+                answer: newCard.answer,
+                isNew: true,
+              });
+            });
+          }
+
+          // Update existing selected cards (or all cards for add_more_cards)
+          const updatedCards = newCards.map((c) => {
+            const shouldUpdate = isAddMoreCards
+              ? improvedIndex <
+                Math.min(improvedCards.length, selectedCardData.length)
+              : prev.selectedCards.has(c.id) &&
+                improvedIndex < improvedCards.length;
+
+            if (shouldUpdate) {
+              const improved = improvedCards[improvedIndex++];
+              console.log(`🔄 DEBUG: Updating card ${c.id}`, {
+                oldQuestion: c.question.substring(0, 30) + "...",
+                newQuestion: improved.question.substring(0, 30) + "...",
+              });
+              return {
+                ...c,
+                question: improved.question,
+                answer: improved.answer,
+              };
+            }
+            return c;
+          });
+
+          return {
+            ...prev,
+            cards: updatedCards,
+            selectedCards: new Set(), // Clear selection after operation
+            error: null, // Clear any previous errors
+          };
+        });
+      } catch (error) {
+        console.error("❌ DEBUG: Bulk improvement failed", error);
+        setState((prev) => ({
+          ...prev,
+          error:
+            error instanceof Error ? error.message : "Failed to improve cards",
+        }));
+      }
+    },
+    [
+      state.selectedCards,
+      state.cards,
+      state.sourceText,
+      state.analysis,
+      bulkImprovements,
+    ]
+  );
+
+  // FIXED: AI suggestions handling with proper state synchronization
+  const handleApplySuggestion = useCallback(
+    async (suggestion: AISuggestion) => {
+      console.log("🔍 DEBUG: Applying AI suggestion", { suggestion });
+
+      try {
+        // Mark suggestion as applied immediately
+        aiSuggestions.applySuggestion(suggestion.id);
+
+        // Handle different suggestion types
+        if (suggestion.instruction === "add_more_cards") {
+          console.log("➕ DEBUG: Applying add_more_cards suggestion");
+          await handleBulkImprovements(
+            "add_more_cards",
+            undefined,
+            suggestion.targetCardCount
+          );
+        } else {
+          // FIXED: Handle selection logic synchronously without setTimeout
+          if (suggestion.requiresSelection && state.selectedCards.size === 0) {
+            console.log("📝 DEBUG: Auto-selecting all cards for suggestion");
+
+            // Get all card IDs for selection
+            const allCardIds = state.cards.map((c) => c.id);
+            
+            // Update state synchronously and then call bulk improvements
+            setState((prev) => ({
+              ...prev,
+              selectedCards: new Set(allCardIds),
+            }));
+
+            // FIXED: Call handleBulkImprovements with explicitly selected cards
+            // to avoid timing issues with state updates
+            console.log("⏳ DEBUG: Applying improvement with auto-selected cards");
+            
+            // Create the selected card data directly instead of relying on state
+            const selectedCardData = state.cards.map((c) => ({
+              id: c.id,
+              question: c.question,
+              answer: c.answer,
+            }));
+
+            console.log("📡 DEBUG: Calling bulkImprovements.improveCards directly");
+            
+            const improvedCards = await bulkImprovements.improveCards(
+              selectedCardData,
+              suggestion.instruction,
+              undefined, // customInstruction
+              state.sourceText,
+              state.analysis?.contentType
+            );
+
+            // Update cards with improvements
+            setState((prev) => {
+              let improvedIndex = 0;
+              const updatedCards = prev.cards.map((c) => {
+                if (improvedIndex < improvedCards.length) {
+                  const improved = improvedCards[improvedIndex++];
+                  console.log(`🔄 DEBUG: Updating card ${c.id} via direct call`);
+                  return {
+                    ...c,
+                    question: improved.question,
+                    answer: improved.answer,
+                  };
+                }
+                return c;
+              });
+
+              return {
+                ...prev,
+                cards: updatedCards,
+                selectedCards: new Set(), // Clear selection after operation
+                error: null,
+              };
+            });
+          } else {
+            // Apply to currently selected cards using existing flow
+            console.log("📋 DEBUG: Applying to currently selected cards");
+            await handleBulkImprovements(suggestion.instruction);
+          }
+        }
+      } catch (error) {
+        console.error("❌ DEBUG: Failed to apply suggestion", error);
+        setState((prev) => ({
+          ...prev,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to apply suggestion",
+        }));
+      }
+    },
+    [state.selectedCards, state.cards, state.sourceText, state.analysis, handleBulkImprovements, aiSuggestions, bulkImprovements]
+  );
+
+  // Bulk delete
   const bulkDeleteCards = useCallback(async () => {
     if (state.selectedCards.size === 0) return;
 
-    setState((prev) => ({ ...prev, bulkOperationLoading: true }));
+    console.log("🗑️ DEBUG: Bulk deleting cards", {
+      count: state.selectedCards.size,
+    });
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
@@ -320,77 +652,14 @@ export function useReviewCards() {
         ...prev,
         cards: prev.cards.filter((c) => !prev.selectedCards.has(c.id)),
         selectedCards: new Set(),
-        bulkOperationLoading: false,
       }));
     } catch {
       setState((prev) => ({
         ...prev,
         error: "Failed to delete selected cards. Please try again.",
-        bulkOperationLoading: false,
       }));
     }
   }, [state.selectedCards]);
-
-  const bulkImproveCards = useCallback(
-    async (instruction: string) => {
-      if (state.selectedCards.size === 0) return;
-
-      setState((prev) => ({ ...prev, bulkOperationLoading: true }));
-
-      try {
-        const selectedCardData = state.cards
-          .filter((c) => state.selectedCards.has(c.id))
-          .map((c) => ({ question: c.question, answer: c.answer }));
-
-        const response = await fetch("/api/flashcards/improve-set", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            cards: selectedCardData,
-            instruction,
-            context: state.sourceText,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to improve cards");
-        }
-
-        const { improvedCards } = await response.json();
-
-        setState((prev) => {
-          let improvedIndex = 0;
-
-          return {
-            ...prev,
-            cards: prev.cards.map((c) => {
-              if (
-                prev.selectedCards.has(c.id) &&
-                improvedIndex < improvedCards.length
-              ) {
-                const improved = improvedCards[improvedIndex++];
-                return {
-                  ...c,
-                  question: improved.question,
-                  answer: improved.answer,
-                };
-              }
-              return c;
-            }),
-            selectedCards: new Set(),
-            bulkOperationLoading: false,
-          };
-        });
-      } catch {
-        setState((prev) => ({
-          ...prev,
-          error: "Failed to improve selected cards. Please try again.",
-          bulkOperationLoading: false,
-        }));
-      }
-    },
-    [state.selectedCards, state.cards, state.sourceText]
-  );
 
   // Save flashcard set
   const handleSaveSet = useCallback(
@@ -469,11 +738,14 @@ export function useReviewCards() {
     // State
     cards: state.cards,
     loading: state.loading,
-    error: state.error,
+    error:
+      state.error ||
+      cardRefinement.error ||
+      bulkImprovements.error ||
+      aiSuggestions.error,
     analysis: state.analysis,
     selectedCards: state.selectedCards,
     editStates: state.editStates,
-    bulkOperationLoading: state.bulkOperationLoading,
     isSaving: state.isSaving,
     saveProgress: state.saveProgress,
 
@@ -483,20 +755,45 @@ export function useReviewCards() {
     saveCard,
     deleteCard,
     addNewCard,
-    improveCard,
     updateEditState,
+
+    // Refinement operations
+    handleCardRefinement,
+    isCardRegenerating: cardRefinement.isRegenerating,
 
     // Selection operations
     toggleCardSelection,
     selectAllCards,
     clearSelection,
     bulkDeleteCards,
-    bulkImproveCards,
+
+    // Bulk improvement operations
+    handleBulkImprovements,
+    bulkImprovementsState: {
+      isImproving: bulkImprovements.isImproving,
+      progress: bulkImprovements.progress,
+      currentOperation: bulkImprovements.currentOperation,
+    },
+
+    // AI suggestions
+    aiSuggestions: {
+      suggestions: aiSuggestions.suggestions,
+      isGenerating: aiSuggestions.isGenerating,
+      error: aiSuggestions.error,
+      onApplySuggestion: handleApplySuggestion,
+      onGenerateMore: aiSuggestions.generateSuggestions, // FIXED: Ensure this is properly connected
+      clearError: aiSuggestions.clearError,
+    },
 
     // Save operations
     handleSaveSet,
 
     // Error handling
-    clearError,
+    clearError: () => {
+      clearError();
+      cardRefinement.clearError();
+      bulkImprovements.clearError();
+      aiSuggestions.clearError();
+    },
   };
 }

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Edit, Trash2, Loader2, CheckCircle } from "lucide-react";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { Eye, Edit, Trash2, CheckCircle } from "lucide-react";
 
 interface ReviewHeaderProps {
   cardsCount: number;
@@ -47,7 +48,7 @@ export function ReviewHeader({
               disabled={bulkOperationLoading}
             >
               {bulkOperationLoading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <LoadingSpinner size="sm" className="mr-2" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}

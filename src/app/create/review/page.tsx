@@ -1,32 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { LoadingButton } from "@/components/shared/LoadingButton";
-import { CardReviewSkeleton } from "@/components/shared/SkeletonLoader";
 import { ReviewPageError } from "@/components/shared/ErrorStates";
-import { useReviewCards } from "@/hooks/create/useReviewCards";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { CardReviewSkeleton } from "@/components/shared/SkeletonLoader";
+import { AISuggestions } from "@/components/create/AISuggestions";
+import { BulkImprovements } from "@/components/create/BulkImprovements";
+import { CardRefinement } from "@/components/create/CardRefinement";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft,
-  AlertCircle,
   CheckCircle,
-  Edit3,
-  Trash2,
-  Save,
-  X,
+  Edit,
   Plus,
-  Zap,
-  Target,
+  Save,
+  ArrowLeft,
+  Lightbulb,
+  X,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
   Brain,
+  Target,
   FileText,
+  Users,
 } from "lucide-react";
+import { useReviewCards } from "@/hooks/create/useReviewCards";
 import {
   Dialog,
   DialogContent,
@@ -34,401 +38,493 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
-import Link from "next/link";
-
-type ViewMode = "preview" | "edit";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function ReviewPage() {
-  const router = useRouter();
-  const [viewMode, setViewMode] = useState<ViewMode>("preview");
-  const [setName, setSetName] = useState("");
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-
   const {
+    // State
     cards,
     loading,
     error,
     analysis,
     selectedCards,
     editStates,
-    bulkOperationLoading,
     isSaving,
     saveProgress,
+
     // Card operations
     startEditing,
     cancelEditing,
     saveCard,
     deleteCard,
     addNewCard,
-    improveCard,
     updateEditState,
+
+    // Refinement operations
+    handleCardRefinement,
+    isCardRegenerating,
+
     // Selection operations
     toggleCardSelection,
     selectAllCards,
     clearSelection,
     bulkDeleteCards,
-    bulkImproveCards,
+
+    // Bulk improvement operations
+    handleBulkImprovements,
+    bulkImprovementsState,
+
+    // AI suggestions
+    aiSuggestions,
+
     // Save operations
     handleSaveSet,
+
     // Error handling
     clearError,
   } = useReviewCards();
 
-  // Show skeleton while loading
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [setName, setSetName] = useState("");
+  const [isAnalysisExpanded, setIsAnalysisExpanded] = useState(false);
+
+  const handleSaveDialogSubmit = async () => {
+    if (!setName.trim()) return;
+
+    try {
+      await handleSaveSet(setName.trim());
+    } catch (error) {
+      console.error("Failed to save set:", error);
+    }
+  };
+
+  // Loading state
   if (loading) {
-    return <CardReviewSkeleton count={5} />;
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <CardReviewSkeleton />
+      </div>
+    );
   }
 
-  // Show error page if there's a major error
-  if (error && cards.length === 0) {
+  // Error state - FIXED: Better error handling
+  if (error) {
+    console.error("❌ DEBUG: Review page error detected", error);
     return (
       <ReviewPageError
         error={error}
-        onRetry={() => window.location.reload()}
-        onGoBack={() => router.push("/create")}
+        onRetry={clearError}
+        onGoBack={() => window.history.back()}
       />
     );
   }
 
-  const handleSave = async () => {
-    if (!setName.trim()) return;
-    await handleSaveSet(setName.trim());
-    setShowSaveDialog(false);
-  };
-
-  const handleImproveCard = async (cardId: string, instruction: string) => {
-    await improveCard(cardId, instruction);
-  };
-
-  const handleBulkImprove = async (instruction: string) => {
-    await bulkImproveCards(instruction);
-  };
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="ghost" asChild>
-            <Link href="/create" className="flex items-center gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Create
-            </Link>
-          </Button>
-        </div>
-
-        <div className="flex items-center justify-between mb-6">
+      {/* Simplified Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <CheckCircle className="w-6 h-6 text-green-600" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Review & Refine Flashcards
+            <h1 className="text-3xl font-bold text-foreground">
+              Review & Edit Flashcards
             </h1>
             <p className="text-muted-foreground">
-              {cards.length} flashcards generated • Edit, improve, or add new
-              cards before saving
+              {cards.length} cards ready. Edit, improve, and save your set.
             </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              variant={viewMode === "preview" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("preview")}
-            >
-              Preview
-            </Button>
-            <Button
-              variant={viewMode === "edit" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("edit")}
-            >
-              Edit Mode
-            </Button>
           </div>
         </div>
 
-        {/* Analysis Summary */}
-        {analysis && (
-          <Card className="bg-primary/5 border-primary/20 mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <Target className="w-5 h-5" />
-                AI Analysis Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground">
-                    {cards.length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Cards Generated
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground capitalize">
-                    {analysis.contentType}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Content Type
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground">
-                    {Math.round(analysis.confidence * 100)}%
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Confidence
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground">
-                    {analysis.keyTopics.length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Key Topics
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {analysis.reasoning}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={addNewCard}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Card
+          </Button>
+          <LoadingButton
+            onClick={() => setIsSaveDialogOpen(true)}
+            loading={isSaving}
+            loadingText="Saving..."
+            disabled={cards.length === 0}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Set
+          </LoadingButton>
+        </div>
       </div>
 
-      {/* Error Display */}
-      {error && cards.length > 0 && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{error}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearError}
-              className="ml-2 h-auto p-0 text-destructive hover:text-destructive"
-            >
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Bulk Actions Bar */}
-      {viewMode === "edit" && (
-        <Card className="mb-6 bg-muted/30">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-muted-foreground">
-                  {selectedCards.size > 0 ? (
-                    <span className="font-medium text-foreground">
-                      {selectedCards.size} card
-                      {selectedCards.size !== 1 ? "s" : ""} selected
-                    </span>
-                  ) : (
-                    "Select cards for bulk actions"
+      {/* Analysis Summary */}
+      {analysis && (
+        <div className="mb-6">
+          {/* Success Banner */}
+          <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800 mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">
+                      {cards.length} flashcards generated successfully
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"
+                      >
+                        {analysis.contentType}
+                      </Badge>
+                      <span className="text-xs text-green-600 dark:text-green-400">
+                        {Math.round(analysis.confidence * 100)}% confidence
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-center">
+                    <div className="font-bold text-green-800 dark:text-green-200">
+                      {cards.length}
+                    </div>
+                    <div className="text-green-600 dark:text-green-400 text-xs">
+                      Cards
+                    </div>
+                  </div>
+                  {analysis.contentGuidance && (
+                    <div className="text-center">
+                      <div className="font-bold text-green-800 dark:text-green-200 capitalize text-xs">
+                        {analysis.contentGuidance.approach.replace("-", " ")}
+                      </div>
+                      <div className="text-green-600 dark:text-green-400 text-xs">
+                        Approach
+                      </div>
+                    </div>
+                  )}
+                  {analysis.keyTopics && analysis.keyTopics.length > 0 && (
+                    <div className="text-center">
+                      <div className="font-bold text-green-800 dark:text-green-200">
+                        {analysis.keyTopics.length}
+                      </div>
+                      <div className="text-green-600 dark:text-green-400 text-xs">
+                        Topics
+                      </div>
+                    </div>
                   )}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                {selectedCards.size > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={clearSelection}>
-                      Clear Selection
-                    </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={bulkOperationLoading}
-                        >
-                          <Zap className="w-4 h-4 mr-2" />
-                          Improve Selected
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            handleBulkImprove("make more challenging")
-                          }
-                        >
-                          Make More Challenging
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleBulkImprove("add examples")}
-                        >
-                          Add Examples
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleBulkImprove("simplify language")}
-                        >
-                          Simplify Language
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            handleBulkImprove("focus on key terms")
-                          }
-                        >
-                          Focus on Key Terms
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={bulkDeleteCards}
-                      disabled={bulkOperationLoading}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Selected
-                    </Button>
+          {/* Expandable Analysis Details */}
+          <Collapsible
+            open={isAnalysisExpanded}
+            onOpenChange={setIsAnalysisExpanded}
+          >
+            <Card className="border-border">
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-foreground">
+                      <Brain className="w-5 h-5 text-primary" />
+                      Analysis Details
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        View breakdown
+                      </span>
+                      {isAnalysisExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </CardHeader>
+              </CollapsibleTrigger>
 
-              <div className="flex items-center gap-2">
-                {cards.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={selectAllCards}
-                    disabled={selectedCards.size === cards.length}
-                  >
-                    Select All
-                  </Button>
-                )}
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg">
+                    <FileText className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
+                        AI Summary:
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {analysis.summary}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        <strong>Strategy:</strong> {analysis.reasoning}
+                      </p>
+                      {analysis.contentGuidance && (
+                        <div className="text-xs text-muted-foreground bg-primary/5 rounded p-2">
+                          <p>
+                            <strong>Generation Approach:</strong>{" "}
+                            {analysis.contentGuidance.approach.replace(
+                              "-",
+                              " "
+                            )}
+                          </p>
+                          <p className="mt-1">
+                            <strong>Expected Range:</strong>{" "}
+                            {analysis.contentGuidance.expectedRange}
+                          </p>
+                          <p className="mt-1">
+                            {analysis.contentGuidance.rationale}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                <Button variant="outline" size="sm" onClick={addNewCard}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Card
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {analysis.keyTopics && analysis.keyTopics.length > 0 && (
+                    <div className="flex items-start gap-3">
+                      <Target className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-foreground mb-2 block">
+                          Key Topics ({analysis.keyTopics.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {analysis.keyTopics.map((topic, index) => (
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {topic}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Vocabulary Terms */}
+                  {analysis.vocabularyTerms &&
+                    analysis.vocabularyTerms.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-4 h-4 mt-0.5 text-xs text-center bg-primary/10 rounded text-primary font-medium">
+                          V
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-foreground mb-2 block">
+                            Vocabulary Terms Found (
+                            {analysis.vocabularyTerms.length}):
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                            {analysis.vocabularyTerms
+                              .slice(0, 15)
+                              .map((term, index) => (
+                                <div
+                                  key={index}
+                                  className="text-xs p-2 bg-muted/30 rounded"
+                                >
+                                  <span className="font-medium text-foreground">
+                                    {term.term}
+                                  </span>
+                                  {term.definition && (
+                                    <div className="text-muted-foreground mt-1">
+                                      {term.definition.length > 40
+                                        ? term.definition.substring(0, 40) +
+                                          "..."
+                                        : term.definition}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            {analysis.vocabularyTerms.length > 15 && (
+                              <div className="text-xs text-muted-foreground p-2 flex items-center justify-center">
+                                +{analysis.vocabularyTerms.length - 15} more
+                                terms
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Question Focus Areas */}
+                  {analysis.suggestedFocus &&
+                    analysis.suggestedFocus.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <Target className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-foreground mb-2 block">
+                            Question Focus Areas:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {analysis.suggestedFocus.map((focus, index) => (
+                              <Badge
+                                key={index}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {focus}
+                              </Badge>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            AI focused on these question types when generating
+                            your flashcards.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        </div>
       )}
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* AI Suggestions - FIXED: Proper event handling */}
+      <div className="mb-6">
+        <AISuggestions
+          suggestions={aiSuggestions.suggestions}
+          isGenerating={aiSuggestions.isGenerating}
+          error={aiSuggestions.error}
+          onApplySuggestion={aiSuggestions.onApplySuggestion}
+          onGenerateMore={aiSuggestions.onGenerateMore}
+          onClearError={aiSuggestions.clearError}
+        />
+      </div>
+
+      {/* Selection & Bulk Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={selectAllCards}>
+              <Users className="w-4 h-4 mr-2" />
+              Select All
+            </Button>
+            {selectedCards.size > 0 && (
+              <>
+                <Button variant="outline" size="sm" onClick={clearSelection}>
+                  Clear ({selectedCards.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={bulkDeleteCards}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <BulkImprovements
+          selectedCount={selectedCards.size}
+          isImproving={bulkImprovementsState.isImproving}
+          progress={bulkImprovementsState.progress}
+          currentOperation={bulkImprovementsState.currentOperation}
+          onImprove={handleBulkImprovements}
+        />
+      </div>
+
+      {/* Cards List */}
+      <div className="space-y-4">
         {cards.map((card, index) => (
           <Card
             key={card.id}
-            className={`bg-card border-border ${
-              selectedCards.has(card.id) ? "ring-2 ring-primary" : ""
-            }`}
+            className={`bg-card border-border transition-all duration-200 ${
+              card.isNew ? "border-primary shadow-md" : ""
+            } ${
+              selectedCards.has(card.id)
+                ? "ring-2 ring-primary bg-primary/5"
+                : ""
+            } ${isCardRegenerating(card.id) ? "opacity-75" : ""}`}
           >
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {viewMode === "edit" && (
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.has(card.id)}
-                      onChange={() => toggleCardSelection(card.id)}
-                      className="w-4 h-4 text-primary"
-                    />
-                  )}
-                  <Badge variant="secondary">Card {index + 1}</Badge>
-                  {card.isNew && <Badge variant="default">New</Badge>}
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedCards.has(card.id)}
+                    onChange={() => {
+                      console.log("🔍 DEBUG: Card selection toggled", {
+                        cardId: card.id,
+                      });
+                      toggleCardSelection(card.id);
+                    }}
+                    className="rounded border-border"
+                    disabled={isCardRegenerating(card.id)}
+                  />
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Card {index + 1}
+                    {card.isNew && (
+                      <Badge variant="secondary" className="ml-2">
+                        New
+                      </Badge>
+                    )}
+                    {isCardRegenerating(card.id) && (
+                      <Badge variant="outline" className="ml-2 animate-pulse">
+                        Improving...
+                      </Badge>
+                    )}
+                  </CardTitle>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  {viewMode === "edit" && !card.isEditing && (
+                <div className="flex gap-2">
+                  <CardRefinement
+                    cardId={card.id}
+                    isRegenerating={isCardRegenerating(card.id)}
+                    onRegenerate={async (instruction) => {
+                      console.log("🔍 DEBUG: Card refinement requested", {
+                        cardId: card.id,
+                        instruction,
+                      });
+                      await handleCardRefinement(card.id, instruction);
+                    }}
+                  />
+
+                  {card.isEditing ? (
                     <>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Zap className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleImproveCard(
-                                card.id,
-                                "make more challenging"
-                              )
-                            }
-                          >
-                            Make More Challenging
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleImproveCard(card.id, "add examples")
-                            }
-                          >
-                            Add Examples
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleImproveCard(card.id, "simplify language")
-                            }
-                          >
-                            Simplify Language
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleImproveCard(card.id, "be more specific")
-                            }
-                          >
-                            Be More Specific
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => startEditing(card.id)}
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteCard(card.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-
-                  {card.isEditing && (
-                    <>
-                      <LoadingButton
                         variant="ghost"
                         size="sm"
                         onClick={() => saveCard(card.id)}
                         disabled={
-                          !editStates[card.id]?.question?.trim() ||
-                          !editStates[card.id]?.answer?.trim()
+                          !editStates[card.id]?.question.trim() ||
+                          !editStates[card.id]?.answer.trim() ||
+                          isCardRegenerating(card.id)
                         }
                       >
                         <Save className="w-4 h-4" />
-                      </LoadingButton>
-
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => cancelEditing(card.id)}
+                        disabled={isCardRegenerating(card.id)}
                       >
                         <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(card.id)}
+                        disabled={isCardRegenerating(card.id)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteCard(card.id)}
+                        disabled={isCardRegenerating(card.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </>
                   )}
@@ -439,9 +535,10 @@ export default function ReviewPage() {
             <CardContent className="space-y-4">
               {/* Question */}
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Question
-                </Label>
+                <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                  Question:
+                  {isCardRegenerating(card.id) && <LoadingSpinner size="sm" />}
+                </h4>
                 {card.isEditing ? (
                   <Textarea
                     value={editStates[card.id]?.question || ""}
@@ -449,20 +546,30 @@ export default function ReviewPage() {
                       updateEditState(card.id, "question", e.target.value)
                     }
                     placeholder="Enter the question..."
-                    className="min-h-[80px]"
+                    className="min-h-[80px] resize-none"
+                    disabled={isCardRegenerating(card.id)}
                   />
                 ) : (
-                  <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                    <p className="text-foreground">{card.question}</p>
+                  <div
+                    className={`text-muted-foreground bg-muted/30 p-3 rounded-lg transition-all duration-200 ${
+                      isCardRegenerating(card.id) ? "animate-pulse" : ""
+                    }`}
+                  >
+                    {card.question || (
+                      <span className="italic text-muted-foreground/60">
+                        Question content will appear here...
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Answer */}
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Answer
-                </Label>
+                <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                  Answer:
+                  {isCardRegenerating(card.id) && <LoadingSpinner size="sm" />}
+                </h4>
                 {card.isEditing ? (
                   <Textarea
                     value={editStates[card.id]?.answer || ""}
@@ -470,158 +577,149 @@ export default function ReviewPage() {
                       updateEditState(card.id, "answer", e.target.value)
                     }
                     placeholder="Enter the answer..."
-                    className="min-h-[80px]"
+                    className="min-h-[80px] resize-none"
+                    disabled={isCardRegenerating(card.id)}
                   />
                 ) : (
-                  <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                    <p className="text-foreground">{card.answer}</p>
+                  <div
+                    className={`text-muted-foreground bg-muted/30 p-3 rounded-lg transition-all duration-200 ${
+                      isCardRegenerating(card.id) ? "animate-pulse" : ""
+                    }`}
+                  >
+                    {card.answer || (
+                      <span className="italic text-muted-foreground/60">
+                        Answer content will appear here...
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* Regeneration Status */}
+              {isCardRegenerating(card.id) && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-sm text-primary">
+                    <LoadingSpinner size="sm" />
+                    <span>
+                      AI is improving this card based on your instructions...
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Save Section */}
-      {cards.length > 0 && (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Ready to Save Your Flashcard Set?
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Your {cards.length} flashcards are ready to be saved and
-                  studied
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/create")}
-                >
-                  Cancel
-                </Button>
-                <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                  <DialogTrigger asChild>
-                    <Button size="lg">
-                      <FileText className="w-4 h-4 mr-2" />
-                      Save Flashcard Set
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Save Flashcard Set</DialogTitle>
-                      <DialogDescription>
-                        Give your flashcard set a name to save it to your
-                        collection.
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="set-name">Set Name</Label>
-                        <Input
-                          id="set-name"
-                          value={setName}
-                          onChange={(e) => setSetName(e.target.value)}
-                          placeholder="Enter a name for your flashcard set..."
-                          className="mt-1"
-                        />
-                      </div>
-
-                      {analysis && (
-                        <div className="bg-muted/30 rounded-lg p-3">
-                          <p className="text-sm text-muted-foreground">
-                            <strong>Content:</strong> {analysis.contentType} •{" "}
-                            {cards.length} cards
-                          </p>
-                          {analysis.keyTopics.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {analysis.keyTopics
-                                .slice(0, 4)
-                                .map((topic, index) => (
-                                  <Badge
-                                    key={index}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {topic}
-                                  </Badge>
-                                ))}
-                              {analysis.keyTopics.length > 4 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  +{analysis.keyTopics.length - 4} more
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {isSaving && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium">
-                              Saving...
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {saveProgress}%
-                            </span>
-                          </div>
-                          <Progress value={saveProgress} className="h-2" />
-                        </div>
-                      )}
-                    </div>
-
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowSaveDialog(false)}
-                        disabled={isSaving}
-                      >
-                        Cancel
-                      </Button>
-                      <LoadingButton
-                        onClick={handleSave}
-                        loading={isSaving}
-                        disabled={!setName.trim()}
-                        loadingText="Saving..."
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Save Set
-                      </LoadingButton>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Empty State */}
-      {cards.length === 0 && !loading && !error && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Brain className="mx-auto w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No Flashcards to Review
+      {cards.length === 0 && (
+        <Card className="bg-muted/30 border-border">
+          <CardContent className="p-12 text-center">
+            <Lightbulb className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              No flashcards to review
             </h3>
             <p className="text-muted-foreground mb-4">
-              It looks like no flashcards were generated. Please try creating
-              them again.
+              It looks like there are no cards to review. Try generating some
+              flashcards first.
             </p>
-            <Button onClick={() => router.push("/create")}>
+            <Button onClick={() => window.history.back()}>
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Create
+              Go Back to Create
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Save Dialog */}
+      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save Flashcard Set</DialogTitle>
+            <DialogDescription>
+              Give your flashcard set a name to save it to your dashboard.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isSaving ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Saving your set...</span>
+                <span className="text-sm text-muted-foreground">
+                  {saveProgress}%
+                </span>
+              </div>
+              <Progress value={saveProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground">
+                Creating {cards.length} flashcards in your dashboard
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Input
+                  placeholder="e.g., Biology Chapter 5 Vocabulary"
+                  value={setName}
+                  onChange={(e) => setSetName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && setName.trim()) {
+                      handleSaveDialogSubmit();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="bg-muted/30 rounded-lg p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Cards to save:</span>
+                  <Badge variant="secondary">{cards.length}</Badge>
+                </div>
+                {analysis && (
+                  <>
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span>Content type:</span>
+                      <Badge variant="outline" className="capitalize">
+                        {analysis.contentType}
+                      </Badge>
+                    </div>
+                    {analysis.keyTopics && analysis.keyTopics.length > 0 && (
+                      <div className="text-sm mt-2">
+                        <span className="text-muted-foreground">Topics: </span>
+                        <span className="text-foreground">
+                          {analysis.keyTopics.slice(0, 3).join(", ")}
+                          {analysis.keyTopics.length > 3 &&
+                            ` (+${analysis.keyTopics.length - 3} more)`}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isSaving && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsSaveDialogOpen(false);
+                  setSetName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveDialogSubmit}
+                disabled={!setName.trim()}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Set
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
