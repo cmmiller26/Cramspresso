@@ -1,5 +1,5 @@
-import type { GeneratedCard } from "@/hooks/create/useGenerationProgress";
-import type { ContentAnalysis } from "@/hooks/create/useContentAnalysis";
+import type { GeneratedCard } from "@/lib/types/api";
+import type { ContentAnalysis } from "@/lib/types/api";
 
 interface SessionData {
   cards: GeneratedCard[];
