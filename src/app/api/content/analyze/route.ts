@@ -15,7 +15,11 @@ interface ContentAnalysis {
   summary: string;
   keyTopics: string[];
   vocabularyTerms: Array<{ term: string; definition?: string }>;
-  estimatedCards: number;
+  contentGuidance: {
+    approach: "one-per-term" | "concept-coverage" | "balanced";
+    rationale: string;
+    expectedRange: string; // e.g., "8-12 cards" or "1 card per term"
+  };
   suggestedFocus: string[];
   reasoning: string;
 }
@@ -35,7 +39,11 @@ Return a JSON object with this exact structure:
   "summary": "Brief description of what this content contains",
   "keyTopics": ["topic1", "topic2", "topic3"],
   "vocabularyTerms": [{"term": "word", "definition": "meaning if found"}],
-  "estimatedCards": number,
+  "contentGuidance": {
+    "approach": "one-per-term" | "concept-coverage" | "balanced",
+    "rationale": "Explain the recommended generation approach",
+    "expectedRange": "Expected number or range of cards (e.g., '1 card per term' or '8-12 cards')"
+  },
   "suggestedFocus": ["definitions", "applications", "comparisons", etc.],
   "reasoning": "Explain why you classified it this way and what makes good flashcards from this content"
 }
@@ -46,9 +54,14 @@ ANALYSIS GUIDELINES:
 - "mixed": Both vocabulary and conceptual content
 - "other": Lists, facts, data that don't fit above categories
 
-- estimatedCards: Aim for 1 card per 30-50 words of substantive content
+CONTENT GUIDANCE APPROACHES:
+- "one-per-term": For vocabulary lists - create one card per vocabulary term
+- "concept-coverage": For conceptual content - ensure comprehensive coverage of concepts
+- "balanced": For mixed content - balance vocabulary and conceptual cards
+
 - keyTopics: 3-5 main subjects/themes in the content
 - vocabularyTerms: Extract clear term-definition pairs if they exist
+- contentGuidance: Recommend generation approach and provide expected range
 - suggestedFocus: What types of questions would work best
 - confidence: How sure you are about the content type (higher = more obvious)
 - reasoning: Help the user understand your analysis
@@ -139,7 +152,7 @@ export async function POST(request: NextRequest) {
       "summary",
       "keyTopics",
       "vocabularyTerms",
-      "estimatedCards",
+      "contentGuidance",
       "suggestedFocus",
       "reasoning",
     ];
@@ -177,10 +190,19 @@ export async function POST(request: NextRequest) {
               : undefined,
           }))
         : [],
-      estimatedCards: Math.max(
-        1,
-        Math.min(50, Number(analysis.estimatedCards) || 5)
-      ),
+      contentGuidance: {
+        approach: ["one-per-term", "concept-coverage", "balanced"].includes(
+          analysis.contentGuidance?.approach
+        )
+          ? (analysis.contentGuidance.approach as ContentAnalysis["contentGuidance"]["approach"])
+          : "balanced",
+        rationale: String(
+          analysis.contentGuidance?.rationale || "Balanced approach recommended"
+        ).substring(0, 300),
+        expectedRange: String(
+          analysis.contentGuidance?.expectedRange || "5-15 cards"
+        ).substring(0, 50),
+      },
       suggestedFocus: Array.isArray(analysis.suggestedFocus)
         ? analysis.suggestedFocus
             .slice(0, 6)
@@ -195,7 +217,8 @@ export async function POST(request: NextRequest) {
     console.log(`Content analysis completed:`, {
       contentType: sanitizedAnalysis.contentType,
       confidence: sanitizedAnalysis.confidence,
-      estimatedCards: sanitizedAnalysis.estimatedCards,
+      approach: sanitizedAnalysis.contentGuidance.approach,
+      expectedRange: sanitizedAnalysis.contentGuidance.expectedRange,
       vocabularyTermsFound: sanitizedAnalysis.vocabularyTerms.length,
     });
 

@@ -6,7 +6,11 @@ export interface ContentAnalysis {
   summary: string;
   keyTopics: string[];
   vocabularyTerms: Array<{ term: string; definition?: string }>;
-  estimatedCards: number;
+  contentGuidance: {
+    approach: "one-per-term" | "concept-coverage" | "balanced";
+    rationale: string;
+    expectedRange: string;
+  };
   suggestedFocus: string[];
   reasoning: string;
 }
