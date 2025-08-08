@@ -1,45 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
-interface ImproveSetRequest {
-  cards: Array<{
-    id?: string; // Optional ID to match cards back
-    question: string;
-    answer: string;
-  }>;
-  improvement:
-    | "make_harder"
-    | "make_easier"
-    | "add_examples"
-    | "add_context"
-    | "diversify_questions"
-    | "improve_clarity"
-    | "add_more_cards"
-    | "fix_grammar";
-  customInstruction?: string; // Optional custom improvement instruction
-  context?: string; // Optional: original text content
-  contentType?: "vocabulary" | "concepts" | "mixed" | "other";
-  targetCardCount?: number; // For "add_more_cards" improvement
-}
-
-interface ImprovedCard {
-  id?: string; // Match back to original if provided
-  question: string;
-  answer: string;
-  isNew?: boolean; // For added cards
-}
+import { openai } from "@/lib/openai";
+import type {
+  BulkImprovementRequest,
+  BulkImprovementType,
+} from "@/lib/types/create";
+import type { Flashcard, GeneratedCard } from "@/lib/types/flashcards";
 
 function createSetImprovementPrompt(
-  cards: ImproveSetRequest["cards"],
-  improvement: string,
+  cards: Array<Flashcard>,
+  improvementType: BulkImprovementType,
   customInstruction?: string,
+  targetCardCount?: number,
   context?: string,
-  contentType?: string,
-  targetCardCount?: number
+  contentType?: string
 ): string {
   const improvementDescriptions = {
     make_harder:
@@ -60,11 +33,11 @@ function createSetImprovementPrompt(
 
   let prompt = `You are an expert at improving educational flashcard sets. Improve the following flashcard set based on the specific instruction.
 
-IMPROVEMENT TYPE: ${improvement}
+IMPROVEMENT TYPE: ${improvementType}
 DESCRIPTION: ${
     improvementDescriptions[
-      improvement as keyof typeof improvementDescriptions
-    ] || improvement
+      improvementType as keyof typeof improvementDescriptions
+    ] || improvementType
   }
 
 ${contentType ? `CONTENT TYPE: ${contentType}` : ""}
@@ -87,7 +60,7 @@ ${customInstruction ? `CUSTOM INSTRUCTION: ${customInstruction}` : ""}
 
 IMPROVEMENT GUIDELINES:`;
 
-  if (improvement === "add_more_cards") {
+  if (improvementType === "add_more_cards") {
     const additionalCards = targetCardCount
       ? targetCardCount - cards.length
       : 3;
@@ -108,7 +81,7 @@ IMPROVEMENT GUIDELINES:`;
 
 SPECIFIC IMPROVEMENT INSTRUCTIONS:`;
 
-  switch (improvement) {
+  switch (improvementType) {
     case "make_harder":
       prompt += `\n- Add complexity to questions (multi-step reasoning, analysis)
 - Include edge cases or exceptions
@@ -164,7 +137,7 @@ Generate the improved flashcard set now:`;
   return prompt;
 }
 
-function validateImprovedCards(cards: unknown): cards is ImprovedCard[] {
+function validateImprovedCards(cards: unknown): cards is Flashcard[] {
   if (!Array.isArray(cards)) {
     return false;
   }
@@ -187,10 +160,10 @@ function validateImprovedCards(cards: unknown): cards is ImprovedCard[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ImproveSetRequest = await request.json();
+    const body: BulkImprovementRequest = await request.json();
     const {
-      cards,
-      improvement,
+      selectedCards,
+      improvementType,
       customInstruction,
       context,
       contentType,
@@ -198,14 +171,18 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validation
-    if (!cards || !Array.isArray(cards) || cards.length === 0) {
+    if (
+      !selectedCards ||
+      !Array.isArray(selectedCards) ||
+      selectedCards.length === 0
+    ) {
       return NextResponse.json(
         { error: "Cards array is required and must not be empty" },
         { status: 400 }
       );
     }
 
-    if (!improvement || typeof improvement !== "string") {
+    if (!improvementType || typeof improvementType !== "string") {
       return NextResponse.json(
         { error: "Improvement type is required" },
         { status: 400 }
@@ -213,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate individual cards
-    const invalidCard = cards.find(
+    const invalidCard = selectedCards.find(
       (card) =>
         !card.question ||
         !card.answer ||
@@ -236,17 +213,17 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = createSetImprovementPrompt(
-      cards,
-      improvement,
+      selectedCards,
+      improvementType,
       customInstruction,
+      targetCardCount,
       context,
-      contentType,
-      targetCardCount
+      contentType
     );
 
     console.log("Improving flashcard set:", {
-      cardCount: cards.length,
-      improvement,
+      cardCount: selectedCards.length,
+      improvementType,
       contentType: contentType || "unknown",
       hasCustomInstruction: !!customInstruction,
       hasContext: !!context,
@@ -277,7 +254,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the improved cards
-    let improvedCards: ImprovedCard[];
+    let improvedCards: GeneratedCard[];
     try {
       // Clean the response in case there's markdown formatting
       const cleanedResponse = response.replace(/```json\n?|\n?```/g, "").trim();
@@ -311,7 +288,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clean up the improved cards
-    const finalCards: ImprovedCard[] = improvedCards.map((card) => ({
+    const finalCards: GeneratedCard[] = improvedCards.map((card) => ({
       id: card.id,
       question: card.question.trim(),
       answer: card.answer.trim(),
@@ -319,17 +296,17 @@ export async function POST(request: NextRequest) {
     }));
 
     // Validation based on improvement type
-    if (improvement === "add_more_cards") {
-      const expectedCount = targetCardCount || cards.length + 3;
+    if (improvementType === "add_more_cards") {
+      const expectedCount = targetCardCount || selectedCards.length + 3;
       if (finalCards.length < expectedCount) {
         console.warn(
           `Expected ${expectedCount} cards but got ${finalCards.length}`
         );
       }
     } else {
-      if (finalCards.length !== cards.length) {
+      if (finalCards.length !== selectedCards.length) {
         console.warn(
-          `Expected ${cards.length} cards but got ${finalCards.length} for improvement: ${improvement}`
+          `Expected ${selectedCards.length} cards but got ${finalCards.length} for improvement: ${improvementType}`
         );
       }
     }
@@ -337,7 +314,7 @@ export async function POST(request: NextRequest) {
     const newCardsCount = finalCards.filter((card) => card.isNew).length;
 
     console.log("Successfully improved flashcard set:", {
-      originalCount: cards.length,
+      originalCount: selectedCards.length,
       finalCount: finalCards.length,
       newCardsAdded: newCardsCount,
     });
@@ -345,8 +322,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       cards: finalCards,
       metadata: {
-        improvement,
-        originalCount: cards.length,
+        improvementType,
+        originalCount: selectedCards.length,
         finalCount: finalCards.length,
         newCardsAdded: newCardsCount,
         contentType: contentType || "unknown",

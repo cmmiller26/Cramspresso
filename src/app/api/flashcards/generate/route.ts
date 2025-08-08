@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-import type { CreateFlashcard as Flashcard } from "@/lib/types/flashcards";
+import { openai } from "@/lib/openai";
+import type { ContentAnalysis, GenerationRequest } from "@/lib/types/create";
+import type { CreateFlashcard } from "@/lib/types/flashcards";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
-interface GenerationRequest {
-  text: string;
-  analysis?: {
-    contentType: "vocabulary" | "concepts" | "mixed" | "other";
-    keyTopics: string[];
-    vocabularyTerms: Array<{ term: string; definition?: string }>;
-    suggestedFocus: string[];
-    contentGuidance?: {
-      approach: "one-per-term" | "concept-coverage" | "balanced";
-      rationale: string;
-    };
-  };
-  focusAreas?: string[]; // User can override suggested focus
-  customInstructions?: string; // Optional additional instructions
-}
-
-function validateFlashcard(card: unknown): card is Flashcard {
+function validateFlashcard(card: unknown): card is CreateFlashcard {
   if (typeof card !== "object" || card === null) {
     return false;
   }
@@ -39,7 +20,7 @@ function validateFlashcard(card: unknown): card is Flashcard {
 
 function createContentAdaptivePrompt(
   text: string,
-  analysis?: GenerationRequest["analysis"],
+  analysis?: ContentAnalysis,
   focusAreas?: string[],
   customInstructions?: string
 ): string {
@@ -243,7 +224,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Parse and validate the JSON response
-    let flashcards: Flashcard[];
+    let flashcards: CreateFlashcard[];
     try {
       // Clean the response in case there's markdown formatting
       const cleanedResponse = response.replace(/```json\n?|\n?```/g, "").trim();
@@ -321,10 +302,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate and filter flashcards
-    const validFlashcards = flashcards.reduce<Flashcard[]>(
+    const validFlashcards = flashcards.reduce<CreateFlashcard[]>(
       (acc, card, index) => {
         if (validateFlashcard(card)) {
-          const validCard = card as Flashcard;
+          const validCard = card as CreateFlashcard;
           const trimmedQuestion = validCard.question.trim();
           const trimmedAnswer = validCard.answer.trim();
           if (trimmedQuestion.length > 0 && trimmedAnswer.length > 0) {

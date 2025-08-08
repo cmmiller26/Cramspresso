@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
-interface AnalysisRequest {
-  text: string;
-}
-
-interface ContentAnalysis {
-  contentType: "vocabulary" | "concepts" | "mixed" | "other";
-  confidence: number;
-  summary: string;
-  keyTopics: string[];
-  vocabularyTerms: Array<{ term: string; definition?: string }>;
-  contentGuidance: {
-    approach: "one-per-term" | "concept-coverage" | "balanced";
-    rationale: string;
-    expectedRange: string; // e.g., "8-12 cards" or "1 card per term"
-  };
-  suggestedFocus: string[];
-  reasoning: string;
-}
+import { openai } from "@/lib/openai";
+import type {
+  AnalyzeContentRequest,
+  ContentAnalysis,
+} from "@/lib/types/create";
 
 function createAnalysisPrompt(text: string): string {
   const wordCount = text.split(/\s+/).length;
@@ -71,7 +52,7 @@ Be thorough but concise. Focus on what would make effective flashcards.`;
 
 export async function POST(request: NextRequest) {
   try {
-    const body: AnalysisRequest = await request.json();
+    const body: AnalyzeContentRequest = await request.json();
     const { text } = body;
 
     // Validation
@@ -194,7 +175,8 @@ export async function POST(request: NextRequest) {
         approach: ["one-per-term", "concept-coverage", "balanced"].includes(
           analysis.contentGuidance?.approach
         )
-          ? (analysis.contentGuidance.approach as ContentAnalysis["contentGuidance"]["approach"])
+          ? (analysis.contentGuidance
+              .approach as ContentAnalysis["contentGuidance"]["approach"])
           : "balanced",
         rationale: String(
           analysis.contentGuidance?.rationale || "Balanced approach recommended"

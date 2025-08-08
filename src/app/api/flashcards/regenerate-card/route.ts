@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
-interface RegenerateCardRequest {
-  originalCard: {
-    question: string;
-    answer: string;
-  };
-  instruction: string; // "make harder", "add examples", "fix grammar", "make clearer", etc.
-  context?: string; // Optional: original text content for better context
-  contentType?: "vocabulary" | "concepts" | "mixed" | "other";
-}
-
-interface RegeneratedCard {
-  question: string;
-  answer: string;
-}
+import { openai } from "@/lib/openai";
+import type {
+  CardRefinementRequest,
+  CardRefinementInstruction,
+} from "@/lib/types/create";
+import type { Flashcard } from "@/lib/types/flashcards";
 
 function createRegenerationPrompt(
-  originalCard: RegenerateCardRequest["originalCard"],
-  instruction: string,
+  originalCard: Flashcard,
+  instruction: CardRefinementInstruction,
   context?: string,
   contentType?: string
 ): string {
@@ -65,7 +51,7 @@ Return a JSON object with "question" and "answer" fields containing the improved
   return prompt;
 }
 
-function validateRegeneratedCard(card: unknown): card is RegeneratedCard {
+function validateRegeneratedCard(card: unknown): card is Flashcard {
   if (typeof card !== "object" || card === null) {
     return false;
   }
@@ -81,7 +67,7 @@ function validateRegeneratedCard(card: unknown): card is RegeneratedCard {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: RegenerateCardRequest = await request.json();
+    const body: CardRefinementRequest = await request.json();
     const { originalCard, instruction, context, contentType } = body;
 
     // Validation
@@ -112,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     const prompt = createRegenerationPrompt(
       originalCard,
-      instruction.trim(),
+      instruction.trim() as CardRefinementInstruction,
       context,
       contentType
     );
@@ -148,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the regenerated card
-    let regeneratedCard: RegeneratedCard;
+    let regeneratedCard: Flashcard;
     try {
       // Clean the response in case there's markdown formatting
       const cleanedResponse = response.replace(/```json\n?|\n?```/g, "").trim();
@@ -182,7 +168,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Clean up the regenerated card
-    const finalCard: RegeneratedCard = {
+    const finalCard: Flashcard = {
+      ...regeneratedCard,
       question: regeneratedCard.question.trim(),
       answer: regeneratedCard.answer.trim(),
     };
