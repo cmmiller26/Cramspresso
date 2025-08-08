@@ -1,5 +1,5 @@
-import type { GeneratedCard } from "@/lib/types/api";
-import type { ContentAnalysis } from "@/lib/types/api";
+import type { ContentAnalysis } from "@/lib/types/create";
+import type { GeneratedCard } from "@/lib/types/flashcards";
 
 interface SessionData {
   cards: GeneratedCard[];
@@ -21,8 +21,8 @@ const SESSION_TIMEOUT = 1000 * 60 * 60; // 1 hour
 export class CardsSessionStorage {
   static save(
     cards: GeneratedCard[],
-    analysis: ContentAnalysis | null,
-    sourceText: string
+    sourceText: string,
+    analysis: ContentAnalysis | null
   ): void {
     try {
       const sessionData: SessionData = {

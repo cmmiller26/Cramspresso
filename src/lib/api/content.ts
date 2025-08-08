@@ -1,4 +1,4 @@
-import type { AnalyzeContentResponse } from "@/lib/types/api";
+import type { AnalyzeContentResponse } from "@/lib/types/create";
 
 /**
  * Analyze content using AI to determine optimal flashcard generation strategy

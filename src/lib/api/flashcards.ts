@@ -1,9 +1,9 @@
 import type {
-  GenerateCardsResponse,
-  ImprovementRequest,
-  ImprovementResponse,
   ContentAnalysis,
-} from "@/lib/types/api";
+  BulkImprovementRequest,
+  BulkImprovementResult,
+} from "@/lib/types/create";
+import type { GeneratedCard } from "@/lib/types/flashcards";
 
 /**
  * Generate flashcards from text content using AI analysis
@@ -12,7 +12,7 @@ export async function generateCards(
   text: string,
   analysis: ContentAnalysis,
   signal?: AbortSignal
-): Promise<GenerateCardsResponse["cards"]> {
+): Promise<GeneratedCard[]> {
   const response = await fetch("/api/flashcards/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -188,12 +188,12 @@ export async function regenerateCard(
  * FIXED: Apply bulk improvements to flashcard sets with proper validation and stub implementation
  */
 export async function improveCardSet(
-  request: ImprovementRequest,
+  request: BulkImprovementRequest,
   signal?: AbortSignal
-): Promise<ImprovementResponse["cards"]> {
+): Promise<BulkImprovementResult> {
   console.log("🔍 DEBUG: improveCardSet called with:", {
-    cardsCount: request.cards?.length || 0,
-    improvement: request.improvement,
+    cardsCount: request.selectedCards?.length || 0,
+    improvementType: request.improvementType,
     customInstruction: request.customInstruction,
     targetCardCount: request.targetCardCount,
     contextLength: request.context?.length || 0,
@@ -207,21 +207,24 @@ export async function improveCardSet(
     throw new Error(error);
   }
 
-  if (!Array.isArray(request.cards) || request.cards.length === 0) {
+  if (
+    !Array.isArray(request.selectedCards) ||
+    request.selectedCards.length === 0
+  ) {
     const error = "At least one card is required for improvement";
     console.error("❌ DEBUG:", error, { request });
     throw new Error(error);
   }
 
-  if (!request.improvement?.trim()) {
+  if (!request.improvementType?.trim()) {
     const error = "Improvement type is required";
     console.error("❌ DEBUG:", error, { request });
     throw new Error(error);
   }
 
   // Validate each card has required fields
-  for (let i = 0; i < request.cards.length; i++) {
-    const card = request.cards[i];
+  for (let i = 0; i < request.selectedCards.length; i++) {
+    const card = request.selectedCards[i];
     if (!card.question?.trim() || !card.answer?.trim()) {
       const error = `Card ${i + 1} is missing question or answer`;
       console.error("❌ DEBUG:", error, { card });
