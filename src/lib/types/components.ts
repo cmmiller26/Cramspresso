@@ -1,12 +1,12 @@
 import type {
+  ContentAnalysis,
   FlowStep,
-  ReviewFlashcard,
   CardEditState,
   AISuggestion,
   BulkImprovementType,
   OperationState,
-} from "@/lib/types/create";
-import type { ContentAnalysis } from "@/lib/types/api";
+} from "./create";
+import { ReviewFlashcard } from "./flashcards";
 
 // === BASE COMPONENT PROPS ===
 
@@ -64,6 +64,8 @@ export interface GenerationStepProps extends StepComponentProps {
   currentStageDescription: string;
   canCancel: boolean;
   onCancel: () => void;
+  onRetry: () => void;
+  onStartOver: () => void;
   contentType?: string;
   contentHint?: string;
   estimatedTimeRemaining?: number;
@@ -85,6 +87,7 @@ export interface CompletionStepProps extends StepComponentProps {
   cardCount: number;
   contentType?: string;
   onRedirect: () => void;
+  onCreateAnother?: () => void;
   autoRedirect?: boolean;
   redirectDelay?: number;
 }
@@ -110,9 +113,12 @@ export interface CardEditorProps extends BaseComponentProps {
   onEdit: () => void;
   onDelete: () => Promise<void>;
   onUpdateField: (field: "question" | "answer", value: string) => void;
+  isSelected?: boolean;
+  onToggleSelection?: (cardId: string) => void;
   isRegenerating?: boolean;
   disabled?: boolean;
   showValidation?: boolean;
+  showSelection?: boolean;
 }
 
 export interface CardDisplayProps extends BaseComponentProps {
@@ -258,7 +264,7 @@ export interface SaveDialogProps extends BaseComponentProps {
   isSaving: boolean;
   saveProgress: number;
   cardCount: number;
-  analysis?: ContentAnalysis;
+  analysis: ContentAnalysis | null;
   defaultName?: string;
 }
 

@@ -1,16 +1,22 @@
 // === CORE FLASHCARD TYPES ===
 
-export interface Flashcard {
-  id: string;
+export interface CreateFlashcard {
   question: string;
   answer: string;
+}
+
+export interface Flashcard extends CreateFlashcard {
+  id: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface CreateFlashcard {
-  question: string;
-  answer: string;
+export interface GeneratedCard extends Flashcard {
+  isNew?: boolean;
+}
+
+export interface ReviewFlashcard extends GeneratedCard {
+  isEditing?: boolean;
 }
 
 // === FLASHCARD SET TYPES ===
