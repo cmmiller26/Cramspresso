@@ -13,7 +13,7 @@ import {
   Zap,
   RefreshCw,
 } from "lucide-react";
-import type { AISuggestion } from "@/hooks/create/useAISuggestions";
+import type { AISuggestion } from "@/lib/types/create";
 
 interface AISuggestionsProps {
   suggestions: AISuggestion[];
@@ -92,7 +92,9 @@ export function AISuggestions({
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <h4 className="font-medium text-destructive mb-1">AI Suggestions Failed</h4>
+              <h4 className="font-medium text-destructive mb-1">
+                AI Suggestions Failed
+              </h4>
               <p className="text-sm text-destructive/80 mb-3">{error}</p>
               <div className="flex gap-2">
                 <Button onClick={onGenerateMore} variant="outline" size="sm">
@@ -247,10 +249,9 @@ export function AISuggestions({
           </div>
 
           <p className="text-xs text-center text-blue-600 dark:text-blue-400 mt-2">
-            {isGenerating 
+            {isGenerating
               ? "AI is analyzing your cards for fresh improvement ideas..."
-              : "AI will analyze your cards again for additional improvements"
-            }
+              : "AI will analyze your cards again for additional improvements"}
           </p>
         </div>
       </CardContent>

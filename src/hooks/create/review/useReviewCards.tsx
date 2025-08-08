@@ -1,41 +1,20 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CardsSessionStorage } from "@/lib/storage/CardsSessionStorage";
-import { useCardRefinement } from "./useCardRefinement";
-import { useBulkImprovements } from "./useBulkImprovements";
-import { useAISuggestions } from "./useAISuggestions";
-import type { ContentAnalysis } from "@/lib/types/api";
-import type { AISuggestion } from "./useAISuggestions";
-
-export interface Flashcard {
-  id: string;
-  question: string;
-  answer: string;
-  isEditing?: boolean;
-  isNew?: boolean;
-}
-
-interface EditState {
-  question: string;
-  answer: string;
-}
-
-interface ReviewCardsState {
-  cards: Flashcard[];
-  loading: boolean;
-  error: string | null;
-  analysis: ContentAnalysis | null;
-  sourceText: string;
-  editStates: Record<string, EditState>;
-  selectedCards: Set<string>;
-  isSaving: boolean;
-  saveProgress: number;
-}
+import { useCardRefinement } from "@/hooks/create/cards/useCardRefinement";
+import { useBulkImprovements } from "@/hooks/create/cards/useBulkImprovements";
+import { useAISuggestions } from "@/hooks/create/cards/useAISuggestions";
+import {
+  AISuggestion,
+  BulkImprovementType,
+  ReviewPageState,
+} from "@/lib/types/create";
+import { ReviewFlashcard } from "@/lib/types/flashcards";
 
 export function useReviewCards() {
   const router = useRouter();
 
-  const [state, setState] = useState<ReviewCardsState>({
+  const [state, setState] = useState<ReviewPageState>({
     cards: [],
     loading: true,
     error: null,
@@ -50,10 +29,7 @@ export function useReviewCards() {
   // Initialize refinement hooks
   const cardRefinement = useCardRefinement();
   const bulkImprovements = useBulkImprovements();
-  const aiSuggestions = useAISuggestions(
-    state.cards.map((c) => ({ question: c.question, answer: c.answer })),
-    state.analysis
-  );
+  const aiSuggestions = useAISuggestions(state.cards, state.analysis);
 
   // Load cards from session storage on mount
   useEffect(() => {
@@ -74,7 +50,7 @@ export function useReviewCards() {
         }
 
         // Convert session cards to review format
-        const cards: Flashcard[] = sessionData.cards.map((card) => ({
+        const cards: ReviewFlashcard[] = sessionData.cards.map((card) => ({
           id: card.id || `card-${Date.now()}-${Math.random()}`,
           question: card.question,
           answer: card.answer,
@@ -217,7 +193,7 @@ export function useReviewCards() {
 
   const addNewCard = useCallback(() => {
     const newId = `new-${Date.now()}`;
-    const newCard: Flashcard = {
+    const newCard: ReviewFlashcard = {
       id: newId,
       question: "",
       answer: "",
@@ -371,12 +347,12 @@ export function useReviewCards() {
   // FIXED: Bulk operations with proper validation and logging
   const handleBulkImprovements = useCallback(
     async (
-      improvement: string,
+      improvementType: BulkImprovementType,
       customInstruction?: string,
       targetCardCount?: number
     ) => {
       console.log("🔍 DEBUG: Starting bulk improvements", {
-        improvement,
+        improvementType,
         selectedCardsSize: state.selectedCards.size,
         selectedCardIds: Array.from(state.selectedCards),
         totalCards: state.cards.length,
@@ -385,7 +361,7 @@ export function useReviewCards() {
       });
 
       // FIXED: Better validation logic
-      const isAddMoreCards = improvement === "add_more_cards";
+      const isAddMoreCards = improvementType === "add_more_cards";
 
       if (!isAddMoreCards && state.selectedCards.size === 0) {
         console.error("❌ DEBUG: No cards selected for non-add operation");
@@ -448,24 +424,24 @@ export function useReviewCards() {
 
         console.log("📡 DEBUG: Calling bulkImprovements.improveCards with:", {
           cardsCount: selectedCardData.length,
-          improvement,
+          improvementType,
           customInstruction,
           contextLength: state.sourceText?.length || 0,
           contentType: state.analysis?.contentType,
           targetCardCount,
         });
 
-        const improvedCards = await bulkImprovements.improveCards(
+        const improvementResult = await bulkImprovements.improveCards(
           selectedCardData,
-          improvement,
+          improvementType,
           customInstruction,
+          targetCardCount,
           state.sourceText,
-          state.analysis?.contentType,
-          targetCardCount
+          state.analysis?.contentType
         );
 
         console.log("✅ DEBUG: Bulk improvement successful", {
-          improvedCount: improvedCards.length,
+          improvedCount: improvementResult.improvedCards.length,
           originalCount: selectedCardData.length,
         });
 
@@ -476,10 +452,12 @@ export function useReviewCards() {
           // Handle "add_more_cards" case
           if (
             isAddMoreCards &&
-            improvedCards.length > selectedCardData.length
+            improvementResult.improvedCards.length > selectedCardData.length
           ) {
             // Add new cards
-            const newCardsToAdd = improvedCards.slice(selectedCardData.length);
+            const newCardsToAdd = improvementResult.improvedCards.slice(
+              selectedCardData.length
+            );
             console.log("➕ DEBUG: Adding new cards", {
               count: newCardsToAdd.length,
             });
@@ -498,12 +476,15 @@ export function useReviewCards() {
           const updatedCards = newCards.map((c) => {
             const shouldUpdate = isAddMoreCards
               ? improvedIndex <
-                Math.min(improvedCards.length, selectedCardData.length)
+                Math.min(
+                  improvementResult.improvedCards.length,
+                  selectedCardData.length
+                )
               : prev.selectedCards.has(c.id) &&
-                improvedIndex < improvedCards.length;
+                improvedIndex < improvementResult.improvedCards.length;
 
             if (shouldUpdate) {
-              const improved = improvedCards[improvedIndex++];
+              const improved = improvementResult.improvedCards[improvedIndex++];
               console.log(`🔄 DEBUG: Updating card ${c.id}`, {
                 oldQuestion: c.question.substring(0, 30) + "...",
                 newQuestion: improved.question.substring(0, 30) + "...",
@@ -566,7 +547,7 @@ export function useReviewCards() {
 
             // Get all card IDs for selection
             const allCardIds = state.cards.map((c) => c.id);
-            
+
             // Update state synchronously and then call bulk improvements
             setState((prev) => ({
               ...prev,
@@ -575,8 +556,10 @@ export function useReviewCards() {
 
             // FIXED: Call handleBulkImprovements with explicitly selected cards
             // to avoid timing issues with state updates
-            console.log("⏳ DEBUG: Applying improvement with auto-selected cards");
-            
+            console.log(
+              "⏳ DEBUG: Applying improvement with auto-selected cards"
+            );
+
             // Create the selected card data directly instead of relying on state
             const selectedCardData = state.cards.map((c) => ({
               id: c.id,
@@ -584,12 +567,15 @@ export function useReviewCards() {
               answer: c.answer,
             }));
 
-            console.log("📡 DEBUG: Calling bulkImprovements.improveCards directly");
-            
-            const improvedCards = await bulkImprovements.improveCards(
+            console.log(
+              "📡 DEBUG: Calling bulkImprovements.improveCards directly"
+            );
+
+            const improvementResult = await bulkImprovements.improveCards(
               selectedCardData,
               suggestion.instruction,
               undefined, // customInstruction
+              undefined, // targetCardCount
               state.sourceText,
               state.analysis?.contentType
             );
@@ -598,9 +584,12 @@ export function useReviewCards() {
             setState((prev) => {
               let improvedIndex = 0;
               const updatedCards = prev.cards.map((c) => {
-                if (improvedIndex < improvedCards.length) {
-                  const improved = improvedCards[improvedIndex++];
-                  console.log(`🔄 DEBUG: Updating card ${c.id} via direct call`);
+                if (improvedIndex < improvementResult.improvedCards.length) {
+                  const improved =
+                    improvementResult.improvedCards[improvedIndex++];
+                  console.log(
+                    `🔄 DEBUG: Updating card ${c.id} via direct call`
+                  );
                   return {
                     ...c,
                     question: improved.question,
@@ -634,7 +623,15 @@ export function useReviewCards() {
         }));
       }
     },
-    [state.selectedCards, state.cards, state.sourceText, state.analysis, handleBulkImprovements, aiSuggestions, bulkImprovements]
+    [
+      state.selectedCards,
+      state.cards,
+      state.sourceText,
+      state.analysis,
+      handleBulkImprovements,
+      aiSuggestions,
+      bulkImprovements,
+    ]
   );
 
   // Bulk delete

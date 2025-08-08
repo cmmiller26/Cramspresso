@@ -1,58 +1,12 @@
 import { useState, useCallback, useRef } from "react";
 import * as flashcardsApi from "@/lib/api/flashcards";
 import * as contentApi from "@/lib/api/content";
-import type { ContentAnalysis, GeneratedCard } from "@/lib/types/api";
-
-interface GenerationStage {
-  id: string;
-  label: string;
-  description: string;
-  duration: number; // milliseconds
-  endProgress: number; // 0-100
-}
-
-const GENERATION_STAGES: GenerationStage[] = [
-  {
-    id: "analyzing",
-    label: "Analyzing Content",
-    description: "AI is understanding your content structure and key concepts",
-    duration: 2500,
-    endProgress: 25,
-  },
-  {
-    id: "planning",
-    label: "Planning Strategy",
-    description: "Determining optimal question types and difficulty levels",
-    duration: 1500,
-    endProgress: 45,
-  },
-  {
-    id: "generating",
-    label: "Creating Flashcards",
-    description: "Creating flashcards for key concepts and vocabulary",
-    duration: 4000,
-    endProgress: 90,
-  },
-  {
-    id: "finalizing",
-    label: "Finalizing",
-    description: "Preparing your flashcards for review",
-    duration: 1000,
-    endProgress: 100,
-  },
-];
-
-interface GenerationState {
-  isGenerating: boolean;
-  currentStage: number;
-  progress: number;
-  error?: string;
-  canCancel: boolean;
-  currentStageDescription: string;
-  generatedCards: GeneratedCard[];
-  contentType?: string;
-  contentHint?: string; // e.g., "15 vocabulary terms" or "3 key concepts"
-}
+import {
+  GENERATION_STAGES,
+  type ContentAnalysis,
+  type GenerationState,
+} from "@/lib/types/create";
+import type { GeneratedCard } from "@/lib/types/flashcards";
 
 interface GenerationContext {
   abortController: AbortController | null;
@@ -66,7 +20,10 @@ function easeOutCubic(t: number): number {
 
 // Helper function to generate content hint
 function generateContentHint(analysis: ContentAnalysis): string {
-  if (analysis.contentType === "vocabulary" && analysis.vocabularyTerms.length > 0) {
+  if (
+    analysis.contentType === "vocabulary" &&
+    analysis.vocabularyTerms.length > 0
+  ) {
     return `${analysis.vocabularyTerms.length} vocabulary terms`;
   } else if (analysis.keyTopics.length > 0) {
     return `${analysis.keyTopics.length} key concepts`;
@@ -210,7 +167,9 @@ export function useGenerationProgress() {
           setState((prev) => ({
             ...prev,
             contentType: finalAnalysis?.contentType,
-            contentHint: finalAnalysis ? generateContentHint(finalAnalysis) : undefined,
+            contentHint: finalAnalysis
+              ? generateContentHint(finalAnalysis)
+              : undefined,
           }));
 
           console.log("✅ Content analysis completed", {
@@ -325,7 +284,7 @@ export function useGenerationProgress() {
         console.log("📊 Generation results:", {
           cardsGenerated: generatedCards.length,
           contentType: finalAnalysis?.contentType,
-          approach: finalAnalysis?.contentGuidance?.approach, 
+          approach: finalAnalysis?.contentGuidance?.approach,
           expectedRange: finalAnalysis?.contentGuidance?.expectedRange,
         });
 

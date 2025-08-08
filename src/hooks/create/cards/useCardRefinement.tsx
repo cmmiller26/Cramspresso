@@ -1,55 +1,6 @@
 import { useState, useCallback } from "react";
 import * as flashcardsApi from "@/lib/api/flashcards";
-
-export interface RefinementInstruction {
-  type:
-    | "make_harder"
-    | "add_examples"
-    | "add_context"
-    | "fix_grammar"
-    | "make_clearer"
-    | "custom";
-  label: string;
-  description: string;
-}
-
-export const REFINEMENT_OPTIONS: RefinementInstruction[] = [
-  {
-    type: "make_harder",
-    label: "Make Harder",
-    description: "Increase difficulty with more complex questions",
-  },
-  {
-    type: "add_examples",
-    label: "Add Examples",
-    description: "Include specific examples in the answer",
-  },
-  {
-    type: "add_context",
-    label: "Add Context",
-    description: "Provide more background information",
-  },
-  {
-    type: "fix_grammar",
-    label: "Fix Grammar",
-    description: "Improve grammar and clarity",
-  },
-  {
-    type: "make_clearer",
-    label: "Make Clearer",
-    description: "Simplify and clarify the language",
-  },
-  {
-    type: "custom",
-    label: "Custom...",
-    description: "Provide specific instructions",
-  },
-];
-
-interface CardRefinementState {
-  regeneratingCards: Set<string>;
-  error: string | null;
-}
+import type { CardRefinementState } from "@/lib/types/create";
 
 export function useCardRefinement() {
   const [state, setState] = useState<CardRefinementState>({

@@ -20,9 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Shuffle, ChevronDown } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import {
-  REFINEMENT_OPTIONS,
-  type RefinementInstruction,
-} from "@/hooks/create/useCardRefinement";
+  CARD_REFINEMENT_OPTIONS,
+  type CardRefinementOption,
+} from "@/lib/types/create";
 
 interface CardRefinementProps {
   cardId: string;
@@ -39,15 +39,15 @@ export function CardRefinement({
   const [customInstruction, setCustomInstruction] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleQuickAction = async (instruction: RefinementInstruction) => {
-    if (instruction.type === "custom") {
+  const handleQuickAction = async (option: CardRefinementOption) => {
+    if (option.instruction === "custom") {
       setIsCustomDialogOpen(true);
       return;
     }
 
     try {
       // FIXED: Always handle as async since the type expects Promise<void>
-      await onRegenerate(instruction.type);
+      await onRegenerate(option.instruction);
     } catch (error) {
       // Error handling is managed by the parent component
       console.error("Failed to regenerate card:", error);
@@ -95,8 +95,8 @@ export function CardRefinement({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          {REFINEMENT_OPTIONS.map((option) => (
-            <div key={option.type}>
+          {CARD_REFINEMENT_OPTIONS.map((option) => (
+            <div key={option.instruction}>
               <DropdownMenuItem
                 onClick={() => handleQuickAction(option)}
                 className="flex flex-col items-start space-y-1 p-3"
@@ -106,7 +106,9 @@ export function CardRefinement({
                   {option.description}
                 </div>
               </DropdownMenuItem>
-              {option.type === "make_clearer" && <DropdownMenuSeparator />}
+              {option.instruction === "make_clearer" && (
+                <DropdownMenuSeparator />
+              )}
             </div>
           ))}
         </DropdownMenuContent>

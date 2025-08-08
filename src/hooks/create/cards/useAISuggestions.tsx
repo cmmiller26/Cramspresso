@@ -1,29 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
-import type { ContentAnalysis } from "@/lib/types/api";
-
-export interface AISuggestion {
-  id: string;
-  type: "difficulty" | "coverage" | "examples" | "clarity" | "count";
-  title: string;
-  description: string;
-  instruction: string;
-  priority: "high" | "medium" | "low";
-  applied: boolean;
-  // Add additional fields for better integration
-  targetCardCount?: number;
-  requiresSelection?: boolean;
-}
-
-interface AISuggestionsState {
-  suggestions: AISuggestion[];
-  isGenerating: boolean;
-  appliedSuggestions: Set<string>;
-  generatedSuggestionTypes: Set<string>; // Track what types we've suggested before
-  error: string | null;
-}
+import type {
+  ContentAnalysis,
+  AISuggestion,
+  AISuggestionsState,
+  BulkImprovementType,
+} from "@/lib/types/create";
+import { Flashcard } from "@/lib/types/flashcards";
 
 export function useAISuggestions(
-  cards: Array<{ question: string; answer: string }>,
+  cards: Array<Flashcard>,
   analysis: ContentAnalysis | null
 ) {
   const [state, setState] = useState<AISuggestionsState>({
@@ -68,7 +53,7 @@ export function useAISuggestions(
       console.log("🤖 DEBUG: Starting AI suggestion generation");
 
       // Add delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // All possible suggestion configurations
       const allPossibleSuggestions = [
@@ -76,7 +61,7 @@ export function useAISuggestions(
         {
           id: "coverage-more-cards",
           type: "coverage" as const,
-          title: "Add more cards for complete coverage", 
+          title: "Add more cards for complete coverage",
           description: `Generate additional cards to improve topic coverage`,
           instruction: "add_more_cards",
           priority: "high" as const,
@@ -84,31 +69,36 @@ export function useAISuggestions(
           targetCardCount: cards.length + Math.ceil(cards.length * 0.3),
           requiresSelection: false,
         },
-        
+
         // Difficulty suggestions
         {
           id: "difficulty-harder",
           type: "difficulty" as const,
           title: "Make cards more challenging",
-          description: "Add complexity, context, and deeper reasoning to questions",
+          description:
+            "Add complexity, context, and deeper reasoning to questions",
           instruction: "make_harder",
           priority: "medium" as const,
           condition: () => {
-            const avgLength = cards.reduce((sum, card) => sum + card.question.length, 0) / cards.length;
+            const avgLength =
+              cards.reduce((sum, card) => sum + card.question.length, 0) /
+              cards.length;
             return avgLength < 80; // Short questions might be too easy
           },
           requiresSelection: true,
         },
 
         {
-          id: "difficulty-easier", 
+          id: "difficulty-easier",
           type: "difficulty" as const,
           title: "Simplify complex cards",
           description: "Make questions clearer and more accessible",
           instruction: "make_easier",
           priority: "medium" as const,
           condition: () => {
-            const avgLength = cards.reduce((sum, card) => sum + card.question.length, 0) / cards.length;
+            const avgLength =
+              cards.reduce((sum, card) => sum + card.question.length, 0) /
+              cards.length;
             return avgLength > 150; // Long questions might be confusing
           },
           requiresSelection: true,
@@ -119,14 +109,16 @@ export function useAISuggestions(
           id: "examples-add",
           type: "examples" as const,
           title: "Add practical examples",
-          description: "Include concrete examples and usage scenarios in answers",
-          instruction: "add_examples", 
+          description:
+            "Include concrete examples and usage scenarios in answers",
+          instruction: "add_examples",
           priority: "medium" as const,
           condition: () => {
-            const hasExamples = cards.some(card => 
-              card.answer.toLowerCase().includes("example") ||
-              card.answer.toLowerCase().includes("for instance") ||
-              card.answer.toLowerCase().includes("such as")
+            const hasExamples = cards.some(
+              (card) =>
+                card.answer.toLowerCase().includes("example") ||
+                card.answer.toLowerCase().includes("for instance") ||
+                card.answer.toLowerCase().includes("such as")
             );
             return !hasExamples;
           },
@@ -137,8 +129,9 @@ export function useAISuggestions(
         {
           id: "context-add",
           type: "clarity" as const,
-          title: "Add context and background", 
-          description: "Provide more background information and connections to related concepts",
+          title: "Add context and background",
+          description:
+            "Provide more background information and connections to related concepts",
           instruction: "add_context",
           priority: "medium" as const,
           condition: () => analysis.contentType === "concepts",
@@ -150,17 +143,19 @@ export function useAISuggestions(
           id: "clarity-improve",
           type: "clarity" as const,
           title: "Improve question clarity",
-          description: "Make questions more specific and unambiguous", 
+          description: "Make questions more specific and unambiguous",
           instruction: "make_clearer",
           priority: "low" as const,
           condition: () => {
-            const avgLength = cards.reduce((sum, card) => sum + card.question.length, 0) / cards.length;
+            const avgLength =
+              cards.reduce((sum, card) => sum + card.question.length, 0) /
+              cards.length;
             return avgLength > 120;
           },
           requiresSelection: true,
         },
 
-        // Grammar suggestions 
+        // Grammar suggestions
         {
           id: "grammar-fix",
           type: "clarity" as const,
@@ -169,11 +164,14 @@ export function useAISuggestions(
           instruction: "fix_grammar",
           priority: "low" as const,
           condition: () => {
-            return cards.some(card => 
-              !card.question.endsWith('?') && !card.question.endsWith('.') ||
-              card.answer.startsWith(' ') || card.answer.endsWith(' ') ||
-              card.question !== card.question.trim() ||
-              card.answer !== card.answer.trim()
+            return cards.some(
+              (card) =>
+                (!card.question.endsWith("?") &&
+                  !card.question.endsWith(".")) ||
+                card.answer.startsWith(" ") ||
+                card.answer.endsWith(" ") ||
+                card.question !== card.question.trim() ||
+                card.answer !== card.answer.trim()
             );
           },
           requiresSelection: true,
@@ -181,10 +179,11 @@ export function useAISuggestions(
 
         // Diversify suggestions
         {
-          id: "diversify-questions", 
+          id: "diversify-questions",
           type: "clarity" as const,
           title: "Diversify question types",
-          description: "Create more varied question formats to avoid repetition",
+          description:
+            "Create more varied question formats to avoid repetition",
           instruction: "diversify_questions",
           priority: "medium" as const,
           condition: () => cards.length >= 5,
@@ -193,7 +192,7 @@ export function useAISuggestions(
       ];
 
       // Filter valid suggestions based on conditions and avoid recently generated types
-      const validSuggestions = allPossibleSuggestions.filter(config => {
+      const validSuggestions = allPossibleSuggestions.filter((config) => {
         try {
           return config.condition();
         } catch (error) {
@@ -204,24 +203,29 @@ export function useAISuggestions(
 
       console.log("📋 DEBUG: Valid suggestions found", {
         total: validSuggestions.length,
-        types: validSuggestions.map(s => s.type),
+        types: validSuggestions.map((s) => s.type),
       });
 
       // Prioritize suggestions that haven't been generated before
-      const freshSuggestions = validSuggestions.filter(config => 
-        !state.generatedSuggestionTypes.has(config.id)
+      const freshSuggestions = validSuggestions.filter(
+        (config) => !state.generatedSuggestionTypes.has(config.id)
       );
 
       // If all suggestions have been used, reset and use all valid ones
-      const suggestionsToUse = freshSuggestions.length > 0 ? freshSuggestions : validSuggestions;
+      const suggestionsToUse =
+        freshSuggestions.length > 0 ? freshSuggestions : validSuggestions;
 
       // Mix priorities and select 2-4 suggestions
-      const highPriority = suggestionsToUse.filter(s => s.priority === "high");
-      const mediumPriority = suggestionsToUse.filter(s => s.priority === "medium");
-      const lowPriority = suggestionsToUse.filter(s => s.priority === "low");
+      const highPriority = suggestionsToUse.filter(
+        (s) => s.priority === "high"
+      );
+      const mediumPriority = suggestionsToUse.filter(
+        (s) => s.priority === "medium"
+      );
+      const lowPriority = suggestionsToUse.filter((s) => s.priority === "low");
 
       const selectedSuggestions: typeof allPossibleSuggestions = [];
-      
+
       // Always include at least one high priority if available
       if (highPriority.length > 0) {
         selectedSuggestions.push(highPriority[0]);
@@ -238,21 +242,23 @@ export function useAISuggestions(
       }
 
       // Convert to AISuggestion format
-      const finalSuggestions: AISuggestion[] = selectedSuggestions.map(config => ({
-        id: config.id,
-        type: config.type,
-        title: config.title,
-        description: config.description,
-        instruction: config.instruction,
-        priority: config.priority,
-        applied: false,
-        targetCardCount: config.targetCardCount,
-        requiresSelection: config.requiresSelection,
-      }));
+      const finalSuggestions: AISuggestion[] = selectedSuggestions.map(
+        (config) => ({
+          id: config.id,
+          type: config.type,
+          title: config.title,
+          description: config.description,
+          instruction: config.instruction as BulkImprovementType,
+          priority: config.priority,
+          applied: false,
+          targetCardCount: config.targetCardCount,
+          requiresSelection: config.requiresSelection,
+        })
+      );
 
       console.log("✅ DEBUG: Generated suggestions", {
         count: finalSuggestions.length,
-        suggestions: finalSuggestions.map(s => ({
+        suggestions: finalSuggestions.map((s) => ({
           id: s.id,
           title: s.title,
           priority: s.priority,
@@ -265,11 +271,10 @@ export function useAISuggestions(
         suggestions: finalSuggestions,
         generatedSuggestionTypes: new Set([
           ...prev.generatedSuggestionTypes,
-          ...finalSuggestions.map(s => s.id),
+          ...finalSuggestions.map((s) => s.id),
         ]),
         isGenerating: false,
       }));
-
     } catch (error) {
       console.error("❌ DEBUG: Failed to generate suggestions", error);
 
@@ -277,10 +282,18 @@ export function useAISuggestions(
         ...prev,
         suggestions: [], // Clear suggestions on error
         isGenerating: false,
-        error: error instanceof Error ? error.message : "Failed to generate suggestions",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate suggestions",
       }));
     }
-  }, [cards, analysis, state.generatedSuggestionTypes, state.suggestions.length]);
+  }, [
+    cards,
+    analysis,
+    state.generatedSuggestionTypes,
+    state.suggestions.length,
+  ]);
 
   const applySuggestion = useCallback((suggestionId: string) => {
     console.log("🔍 DEBUG: Applying suggestion", { suggestionId });
@@ -309,11 +322,22 @@ export function useAISuggestions(
     });
 
     // Only auto-generate on initial load when no suggestions exist and not already generating
-    if (cards.length > 0 && analysis && state.suggestions.length === 0 && !state.isGenerating) {
+    if (
+      cards.length > 0 &&
+      analysis &&
+      state.suggestions.length === 0 &&
+      !state.isGenerating
+    ) {
       console.log("🤖 DEBUG: Auto-generating initial suggestions");
       generateSuggestions();
     }
-  }, [cards.length, analysis, state.suggestions.length, state.isGenerating, generateSuggestions]);
+  }, [
+    cards.length,
+    analysis,
+    state.suggestions.length,
+    state.isGenerating,
+    generateSuggestions,
+  ]);
 
   return {
     ...state,

@@ -1,15 +1,9 @@
 import { useState, useCallback } from "react";
 import * as contentApi from "@/lib/api/content";
-import type { ContentAnalysis } from "@/lib/types/api";
-
-interface AnalysisState {
-  isAnalyzing: boolean;
-  analysis: ContentAnalysis | null;
-  error: string | null;
-}
+import type { ContentAnalysis, ContentAnalysisState } from "@/lib/types/create";
 
 export function useContentAnalysis() {
-  const [state, setState] = useState<AnalysisState>({
+  const [state, setState] = useState<ContentAnalysisState>({
     isAnalyzing: false,
     analysis: null,
     error: null,

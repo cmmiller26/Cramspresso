@@ -25,7 +25,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import {
   BULK_IMPROVEMENT_OPTIONS,
   type BulkImprovementOption,
-} from "@/hooks/create/useBulkImprovements";
+} from "@/lib/types/create";
 
 interface BulkImprovementsProps {
   selectedCount: number;
