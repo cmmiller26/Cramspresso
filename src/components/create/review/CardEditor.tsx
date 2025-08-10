@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingButton } from "@/components/shared/LoadingButton";
+import { CardRefinement } from "@/components/create/cards/CardRefinement";
 import { useLoadingState } from "@/hooks/shared/useLoadingState";
 import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { Edit3, Save, X, Trash2, RotateCcw } from "lucide-react";
@@ -20,6 +21,7 @@ export const CardEditor = React.memo(function CardEditor({
   onUpdateField,
   isSelected = false,
   onToggleSelection,
+  onRefineCard,
   isRegenerating = false,
   disabled = false,
   showValidation = true,
@@ -102,6 +104,13 @@ export const CardEditor = React.memo(function CardEditor({
                   >
                     <Edit3 className="w-4 h-4" />
                   </Button>
+                  {onRefineCard && (
+                    <CardRefinement
+                      cardId={card.id}
+                      isRegenerating={isRegenerating}
+                      onRegenerate={onRefineCard}
+                    />
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"

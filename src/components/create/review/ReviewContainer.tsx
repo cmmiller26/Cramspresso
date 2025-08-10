@@ -3,9 +3,11 @@ import { AnalysisDisplay } from "@/components/create/generation/AnalysisDisplay"
 import { CardList } from "./CardList";
 import { SelectionControls } from "./SelectionControls";
 import { SaveSetDialog } from "./SaveSetDialog";
+import { AISuggestions } from "@/components/create/cards/AISuggestions";
+import { BulkImprovements } from "@/components/create/cards/BulkImprovements";
 import { useLoadingState } from "@/hooks/shared/useLoadingState";
 import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
-import type { ContentAnalysis, EditStatesMap } from "@/lib/types/create";
+import type { ContentAnalysis, EditStatesMap, AISuggestion, BulkImprovementType } from "@/lib/types/create";
 import type { ReviewFlashcard } from "@/lib/types/flashcards";
 
 interface ReviewContainerProps {
@@ -28,6 +30,20 @@ interface ReviewContainerProps {
   onStartEdit: (cardId: string) => void;
   onCancelEdit: (cardId: string) => void;
   onSaveSet: (name: string) => Promise<void>;
+  // AI Features
+  suggestions: AISuggestion[];
+  onApplySuggestion: (suggestion: AISuggestion) => Promise<void>;
+  onBulkImprove: (
+    improvementType: BulkImprovementType,
+    customInstruction?: string,
+    targetCardCount?: number
+  ) => Promise<void>;
+  onRefineCard: (cardId: string, instruction: string) => Promise<void>;
+  onRequestSuggestions: () => Promise<void>;
+  isGeneratingSuggestions: boolean;
+  isImproving: boolean;
+  improvementProgress: number;
+  currentOperation: string;
   className?: string;
 }
 
@@ -47,6 +63,16 @@ export function ReviewContainer({
   onStartEdit,
   onCancelEdit,
   onSaveSet,
+  // AI Features
+  suggestions,
+  onApplySuggestion,
+  onBulkImprove,
+  onRefineCard,
+  onRequestSuggestions,
+  isGeneratingSuggestions,
+  isImproving,
+  improvementProgress,
+  currentOperation,
   className = "",
 }: ReviewContainerProps) {
   const { isLoading } = useLoadingState([
@@ -91,16 +117,37 @@ export function ReviewContainer({
         />
       )}
 
-      {/* Selection Controls */}
-      <SelectionControls
-        selectedCount={selectedCards.size}
-        totalCount={cards.length}
-        onSelectAll={onSelectAll}
-        onClearSelection={onClearSelection}
-        onBulkDelete={handleBulkDelete}
-        disabled={isLoading("bulk-delete")}
-        showBulkActions={selectedCards.size > 0}
+      {/* AI Suggestions */}
+      <AISuggestions
+        suggestions={suggestions}
+        isGenerating={isGeneratingSuggestions}
+        onApplySuggestion={onApplySuggestion}
+        onGenerateMore={onRequestSuggestions}
       />
+
+      {/* Selection Controls with Bulk Improvements */}
+      <div className="space-y-4">
+        <SelectionControls
+          selectedCount={selectedCards.size}
+          totalCount={cards.length}
+          onSelectAll={onSelectAll}
+          onClearSelection={onClearSelection}
+          onBulkDelete={handleBulkDelete}
+          disabled={isLoading("bulk-delete")}
+          showBulkActions={selectedCards.size > 0}
+        />
+
+        {/* Bulk Improvements */}
+        <BulkImprovements
+          selectedCount={selectedCards.size}
+          isImproving={isImproving}
+          progress={improvementProgress}
+          currentOperation={currentOperation}
+          onImprove={(improvement, customInstruction, targetCardCount) => 
+            onBulkImprove(improvement as BulkImprovementType, customInstruction, targetCardCount)
+          }
+        />
+      </div>
 
       {/* Card List */}
       <CardList
@@ -112,6 +159,7 @@ export function ReviewContainer({
         onCardSelect={onToggleSelection}
         onStartEdit={onStartEdit}
         onCancelEdit={onCancelEdit}
+        onRefineCard={onRefineCard}
       />
 
       {/* Save Actions */}

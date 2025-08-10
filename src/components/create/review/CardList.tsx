@@ -16,6 +16,7 @@ interface CardListProps {
   onCardSelect: (cardId: string) => void;
   onStartEdit: (cardId: string) => void;
   onCancelEdit: (cardId: string) => void;
+  onRefineCard?: (cardId: string, instruction: string) => Promise<void>;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export const CardList = React.memo(function CardList({
   onCardSelect,
   onStartEdit,
   onCancelEdit,
+  onRefineCard,
   className = "",
 }: CardListProps) {
   const [loadingCards, setLoadingCards] = React.useState<Set<string>>(
@@ -137,6 +139,7 @@ export const CardList = React.memo(function CardList({
                 handleUpdateField(card.id, field, value)
               }
               onToggleSelection={() => onCardSelect(card.id)}
+              onRefineCard={onRefineCard ? (instruction) => onRefineCard(card.id, instruction) : undefined}
               disabled={isLoading}
               showSelection={true}
               showValidation={true}

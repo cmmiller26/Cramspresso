@@ -115,6 +115,7 @@ export interface CardEditorProps extends BaseComponentProps {
   onUpdateField: (field: "question" | "answer", value: string) => void;
   isSelected?: boolean;
   onToggleSelection?: (cardId: string) => void;
+  onRefineCard?: (instruction: string) => Promise<void>;
   isRegenerating?: boolean;
   disabled?: boolean;
   showValidation?: boolean;
