@@ -89,6 +89,13 @@ export const LOADING_STATES = {
   DASHBOARD_INIT: "dashboard_init",
   SETS_FETCH: "sets_fetch",
   SET_CREATE: "set_create",
+  // Set Management
+  SET_LOAD: "set_load",
+  SET_DELETE: "set_delete",
+  SET_NAME_UPDATE: "set_name_update",
+  CARD_ADD: "card_add",
+  CARD_UPDATE: "card_update",
+  CARD_DELETE: "card_delete",
 } as const;
 
 export type LoadingStateKey =

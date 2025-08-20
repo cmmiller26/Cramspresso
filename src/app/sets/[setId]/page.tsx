@@ -7,7 +7,10 @@ import { ArrowLeft } from "lucide-react";
 import { SetOverview } from "@/components/sets/SetOverview";
 import { SetActions } from "@/components/sets/SetActions";
 import { CardList } from "@/components/sets/CardList";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { useLoadingState, LOADING_STATES } from "@/hooks/shared/useLoadingState";
+import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { Flashcard } from "@/lib/types/flashcards";
 import * as setsApi from "@/lib/api/sets";
 
@@ -25,8 +28,12 @@ export default function SetDetailView() {
   const router = useRouter();
 
   const [setData, setSetData] = useState<SetData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Shared infrastructure for loading states
+  const { setLoading, isLoading } = useLoadingState([LOADING_STATES.SET_LOAD]);
+  
+  // Shared infrastructure for error handling  
+  const { showError, clearError, renderError, hasError } = useErrorHandler();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -39,26 +46,39 @@ export default function SetDetailView() {
   const loadSet = useCallback(async () => {
     if (!isSignedIn) return;
 
-    setLoading(true);
-    setError(null);
+    setLoading(LOADING_STATES.SET_LOAD, true);
+    clearError();
     try {
-      const res = await fetch(`/api/sets/${setId}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error("Set not found");
-        }
-        throw new Error("Failed to load set");
-      }
-
-      const data = await res.json();
+      // Use centralized API client
+      const data = await setsApi.getSetById(setId);
       setSetData(data);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const errorMessage = err instanceof Error ? err.message : "Failed to load flashcard set";
+      
+      if (errorMessage.includes("not found") || errorMessage.includes("404")) {
+        showError(
+          "SET_NOT_FOUND",
+          "This flashcard set was not found. It may have been deleted or you may not have permission to view it.",
+          {
+            onRetry: () => loadSet(),
+            onDismiss: () => router.push("/dashboard"),
+          }
+        );
+      } else {
+        showError(
+          "SET_LOAD_ERROR",
+          errorMessage,
+          {
+            onRetry: () => loadSet(),
+            onDismiss: clearError,
+          }
+        );
+      }
     } finally {
-      setLoading(false);
+      setLoading(LOADING_STATES.SET_LOAD, false);
     }
-  }, [setId, isSignedIn]);
+  }, [setId, isSignedIn, setLoading, clearError, showError, router]);
 
   useEffect(() => {
     loadSet();
@@ -71,23 +91,18 @@ export default function SetDetailView() {
 
   // Show loading state while checking auth
   if (!isLoaded || !isSignedIn) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" text="Checking authentication..." />
+      </div>
+    );
   }
 
   // Show error state
-  if (error) {
+  if (hasError) {
     return (
       <main className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Error</h1>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="text-primary hover:underline"
-          >
-            Return to Dashboard
-          </button>
-        </div>
+        {renderError()}
       </main>
     );
   }
@@ -99,14 +114,15 @@ export default function SetDetailView() {
       </title>
       <main className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Back Navigation */}
-        <Button
+        <LoadingButton
           variant="ghost"
-          onClick={() => router.push("/dashboard")}
+          onClick={async () => router.push("/dashboard")}
           className="mb-2"
+          loadingText="Loading Dashboard..."
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Dashboard
-        </Button>
+        </LoadingButton>
 
         {/* Set Overview */}
         <SetOverview
@@ -114,7 +130,7 @@ export default function SetDetailView() {
           cardCount={setData?.cards.length || 0}
           createdAt={setData?.createdAt}
           updatedAt={setData?.updatedAt}
-          loading={loading}
+          loading={isLoading(LOADING_STATES.SET_LOAD)}
         />
 
         {/* Actions */}
@@ -124,7 +140,7 @@ export default function SetDetailView() {
             setName={setData.name}
             cardCount={setData.cards.length}
             onDelete={handleDelete}
-            loading={loading}
+            loading={isLoading(LOADING_STATES.SET_LOAD)}
           />
         )}
 
@@ -136,7 +152,7 @@ export default function SetDetailView() {
           <CardList
             cards={setData?.cards || []}
             variant="overview"
-            loading={loading}
+            loading={isLoading(LOADING_STATES.SET_LOAD)}
           />
         </div>
       </main>

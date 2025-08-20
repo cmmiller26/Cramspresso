@@ -7,8 +7,8 @@ export interface CreateFlashcard {
 
 export interface Flashcard extends CreateFlashcard {
   id: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface GeneratedCard extends Flashcard {
