@@ -4,10 +4,8 @@ import {
   TrendingUp,
   BookOpen,
   Target,
-  Upload,
-  FileText,
   Brain,
-  ArrowLeft,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -84,22 +82,6 @@ export function StatsOverviewError({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
-// Set grid error state
-export function SetGridError({ onRetry }: { onRetry?: () => void }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div className="md:col-span-2 lg:col-span-3">
-        <ErrorState
-          title="Unable to load flashcard sets"
-          message="There was a problem loading your sets. Check your connection and try again."
-          onRetry={onRetry}
-          className="py-12"
-        />
-      </div>
-    </div>
-  );
-}
-
 // Study mode error state
 export function StudyModeError({
   onRetry,
@@ -122,177 +104,6 @@ export function StudyModeError({
         {onGoBack && (
           <Button onClick={onGoBack} variant="outline">
             Go Back
-          </Button>
-        )}
-        {onRetry && (
-          <Button onClick={onRetry}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Study session loading error
-export function StudyLoadingError({
-  error,
-  onRetry,
-  onGoBack,
-}: {
-  error: string;
-  onRetry?: () => void;
-  onGoBack?: () => void;
-}) {
-  return (
-    <div className="bg-card border border-destructive/20 rounded-lg p-8 text-center min-h-[400px] flex flex-col justify-center">
-      <div className="p-3 bg-destructive/10 rounded-full mx-auto w-fit mb-4">
-        <Brain className="h-8 w-8 text-destructive" />
-      </div>
-      <h3 className="text-lg font-medium text-foreground mb-2">
-        Unable to Start Study Session
-      </h3>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
-      <div className="flex gap-3 justify-center">
-        {onGoBack && (
-          <Button onClick={onGoBack} variant="outline">
-            Go Back
-          </Button>
-        )}
-        {onRetry && (
-          <Button onClick={onRetry}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Study controls error (for when shuffle/reset fails)
-export function StudyControlsError({
-  error,
-  onRetry,
-  onDismiss,
-}: {
-  error: string;
-  onRetry?: () => void;
-  onDismiss?: () => void;
-}) {
-  return (
-    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 mb-4">
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
-        <div className="flex-1">
-          <h4 className="font-medium text-destructive mb-1">Control Error</h4>
-          <p className="text-sm text-destructive/80 mb-3">{error}</p>
-          <div className="flex gap-2">
-            {onRetry && (
-              <Button onClick={onRetry} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-            )}
-            {onDismiss && (
-              <Button onClick={onDismiss} variant="ghost" size="sm">
-                Dismiss
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Empty study session error
-export function EmptyStudySetError({
-  setName,
-  onGoBack,
-}: {
-  setName: string;
-  onGoBack?: () => void;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-lg p-8 text-center min-h-[400px] flex flex-col justify-center">
-      <div className="p-3 bg-muted/50 rounded-full mx-auto w-fit mb-4">
-        <BookOpen className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-medium text-foreground mb-2">
-        No Cards to Study
-      </h3>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        The set &quot;{setName}&quot; doesn&apos;t contain any flashcards yet.
-        Add some cards before starting a study session.
-      </p>
-      <div className="flex gap-3 justify-center">
-        {onGoBack && (
-          <Button onClick={onGoBack} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Set
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Create flow error state
-export function CreateFlowError({
-  onRetry,
-  onStartOver,
-  stage = "upload",
-}: {
-  onRetry?: () => void;
-  onStartOver?: () => void;
-  stage?: "upload" | "extraction" | "generation" | "review" | "save";
-}) {
-  const stageMessages = {
-    upload: {
-      title: "Upload failed",
-      message: "There was a problem uploading your file. Please try again.",
-      icon: Upload,
-    },
-    extraction: {
-      title: "Text extraction failed",
-      message:
-        "We couldn't extract text from your file. Please try a different file or paste text directly.",
-      icon: FileText,
-    },
-    generation: {
-      title: "Generation failed",
-      message:
-        "We couldn't generate flashcards from your content. Please try again.",
-      icon: Brain,
-    },
-    review: {
-      title: "Review failed",
-      message: "There was a problem loading the generated cards.",
-      icon: FileText,
-    },
-    save: {
-      title: "Save failed",
-      message:
-        "There was a problem saving your flashcard set. Please try again.",
-      icon: FileText,
-    },
-  };
-
-  const { title, message, icon: StageIcon } = stageMessages[stage];
-
-  return (
-    <div className="flex flex-col items-center justify-center text-center p-6 py-12">
-      <div className="p-3 bg-destructive/10 rounded-full mb-4">
-        <StageIcon className="h-8 w-8 text-destructive" />
-      </div>
-      <h3 className="font-medium text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground mb-4 max-w-md">{message}</p>
-      <div className="flex gap-3 justify-center">
-        {onStartOver && (
-          <Button onClick={onStartOver} variant="outline">
-            Start Over
           </Button>
         )}
         {onRetry && (
@@ -336,6 +147,70 @@ export function FileUploadError({
               </Button>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// File upload warning (for cancellations, etc.)
+export function FileUploadWarning({
+  message,
+  onClear,
+}: {
+  message: string;
+  onClear?: () => void;
+}) {
+  return (
+    <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+            {message}
+          </p>
+          {onClear && (
+            <Button
+              onClick={onClear}
+              variant="ghost"
+              size="sm"
+              className="text-yellow-700 dark:text-yellow-300 hover:text-yellow-800 dark:hover:text-yellow-200"
+            >
+              Dismiss
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Success message component for cancellations
+export function CancellationSuccess({
+  message,
+  onClear,
+}: {
+  message: string;
+  onClear?: () => void;
+}) {
+  return (
+    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+            {message}
+          </p>
+          {onClear && (
+            <Button
+              onClick={onClear}
+              variant="ghost"
+              size="sm"
+              className="text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200"
+            >
+              Dismiss
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -414,6 +289,120 @@ export function ReviewPageError({
               Try Again
             </Button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Card refinement error
+export function CardRefinementError({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 mb-4">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="font-medium text-destructive text-sm mb-1">
+            Refinement Failed
+          </h4>
+          <p className="text-sm text-destructive/80 mb-2">{error}</p>
+          <div className="flex gap-2">
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline" size="sm">
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Try Again
+              </Button>
+            )}
+            {onDismiss && (
+              <Button onClick={onDismiss} variant="ghost" size="sm">
+                Dismiss
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Bulk improvements error
+export function BulkImprovementsError({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 mb-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="font-medium text-destructive mb-1">
+            Bulk Improvement Failed
+          </h4>
+          <p className="text-sm text-destructive/80 mb-3">{error}</p>
+          <div className="flex gap-2">
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            )}
+            {onDismiss && (
+              <Button onClick={onDismiss} variant="ghost" size="sm">
+                Dismiss
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// AI Suggestions error
+export function AISuggestionsError({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="font-medium text-destructive mb-1">
+            AI Suggestions Failed
+          </h4>
+          <p className="text-sm text-destructive/80 mb-3">{error}</p>
+          <div className="flex gap-2">
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            )}
+            {onDismiss && (
+              <Button onClick={onDismiss} variant="ghost" size="sm">
+                Dismiss
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

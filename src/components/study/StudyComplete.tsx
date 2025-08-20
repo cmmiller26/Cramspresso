@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/shared/LoadingButton";
 import { Trophy, Clock, Target, RotateCcw, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import type { StudySession, StudyRound } from "@/lib/flashcards";
+import type { StudySession, StudyRound } from "@/lib/types/flashcards";
 
 interface StudyCompleteProps {
   studySession: StudySession;

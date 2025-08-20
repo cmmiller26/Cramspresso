@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Flashcard, StudyRound, StudySession } from "@/lib/flashcards";
+import { FlashcardSet, StudyRound, StudySession } from "@/lib/types/flashcards";
 import { useStudyKeyboard } from "./useStudyKeyboard";
-
-interface SetData {
-  id: string;
-  name: string;
-  cards: Flashcard[];
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface StudyActions {
   onShowAnswer: () => void;
@@ -27,7 +19,7 @@ interface StudyActions {
 
 interface StudyState {
   // Data state
-  setData: SetData | null;
+  setData: FlashcardSet | null;
   studySession: StudySession | null;
   currentRound: StudyRound | null;
 
@@ -57,7 +49,7 @@ export function useStudyState(setId: string): StudyState {
   const { isSignedIn } = useAuth();
 
   // Core study state
-  const [setData, setSetData] = useState<SetData | null>(null);
+  const [setData, setSetData] = useState<FlashcardSet | null>(null);
   const [studySession, setStudySession] = useState<StudySession | null>(null);
   const [currentRound, setCurrentRound] = useState<StudyRound | null>(null);
 

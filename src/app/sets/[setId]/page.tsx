@@ -8,8 +8,8 @@ import { SetOverview } from "@/components/sets/SetOverview";
 import { SetActions } from "@/components/sets/SetActions";
 import { CardList } from "@/components/sets/CardList";
 import { Button } from "@/components/ui/button";
-import { Flashcard } from "@/lib/flashcards";
-import { deleteSet } from "@/lib/flashcardApi";
+import { Flashcard } from "@/lib/types/flashcards";
+import * as setsApi from "@/lib/api/sets";
 
 interface SetData {
   id: string;
@@ -65,7 +65,7 @@ export default function SetDetailView() {
   }, [loadSet]);
 
   const handleDelete = async () => {
-    await deleteSet(setId);
+    await setsApi.deleteSet(setId);
     // Navigation handled by SetActions component
   };
 

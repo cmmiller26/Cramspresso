@@ -9,7 +9,7 @@ import { StudyControls } from "./StudyControls";
 import { StudyTimer } from "./StudyTimer";
 import { StudyKeyboardShortcuts } from "./StudyKeyboardShortcuts";
 import { StudyComplete } from "./StudyComplete";
-import type { StudySession, StudyRound } from "@/lib/flashcards";
+import type { StudySession, StudyRound } from "@/lib/types/flashcards";
 
 interface StudyInterfaceProps {
   // Session and round data

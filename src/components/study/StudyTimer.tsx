@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Timer } from "lucide-react";
-import type { StudySession, StudyRound } from "@/lib/flashcards";
+import type { StudySession, StudyRound } from "@/lib/types/flashcards";
 
 interface StudyTimerProps {
   studySession: StudySession;
@@ -35,10 +35,14 @@ export function StudyTimer({ studySession, currentRound }: StudyTimerProps) {
   };
 
   // Calculate session duration (total time studying)
-  const sessionElapsed = Math.floor((currentTime.getTime() - studySession.startTime.getTime()) / 1000);
-  
+  const sessionElapsed = Math.floor(
+    (currentTime.getTime() - studySession.startTime.getTime()) / 1000
+  );
+
   // Calculate current round duration
-  const roundElapsed = Math.floor((currentTime.getTime() - currentRound.startTime.getTime()) / 1000);
+  const roundElapsed = Math.floor(
+    (currentTime.getTime() - currentRound.startTime.getTime()) / 1000
+  );
 
   return (
     <Card>

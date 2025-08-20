@@ -1,161 +1,69 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, AlertCircle } from "lucide-react";
-import { ReviewHeader } from "@/components/create/ReviewHeader";
-import { BulkActions } from "@/components/create/BulkActions";
-import { CardsList } from "@/components/create/CardsList";
-import { SaveSection } from "@/components/create/SaveSection";
-import { CardReviewSkeleton } from "@/components/shared/SkeletonLoader";
-import { ReviewPageError } from "@/components/shared/ErrorStates";
-import { LoadingButton } from "@/components/shared/LoadingButton";
-import { useReviewCards } from "@/hooks/create/useReviewCards";
-import Link from "next/link";
-
-type ViewMode = "preview" | "edit";
+import { ReviewContainer } from "@/components/create/review/ReviewContainer";
+import { ArrowLeft } from "lucide-react";
+import { useReviewOrchestrator } from "@/hooks/create/review/useReviewOrchestrator";
 
 export default function ReviewPage() {
-  const router = useRouter();
-  const [viewMode, setViewMode] = useState<ViewMode>("preview");
+  const reviewState = useReviewOrchestrator();
 
-  const {
-    cards,
-    loading,
-    error,
-    selectedCards,
-    editStates,
-    bulkOperationLoading,
-    isSaving,
-    saveProgress,
-    // Card operations
-    startEditing,
-    cancelEditing,
-    saveCard,
-    deleteCard,
-    addNewCard,
-    updateEditState,
-    // Selection operations
-    toggleCardSelection,
-    selectAllCards,
-    clearSelection,
-    bulkDeleteCards,
-    // Save operations
-    handleSaveSet,
-    // Error handling
-    clearError,
-  } = useReviewCards();
-
-  useEffect(() => {
-    // Load cards on mount - this will be handled by the hook
-  }, []);
-
-  // Show skeleton while loading
-  if (loading) {
-    return <CardReviewSkeleton count={5} />;
+  if (reviewState.loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading your flashcards...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // Show error page if there's a major error
-  if (error && cards.length === 0) {
+  if (reviewState.error) {
     return (
-      <ReviewPageError
-        error={error}
-        onRetry={() => window.location.reload()}
-        onGoBack={() => router.push("/create")}
-      />
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-destructive mb-4">
+            Failed to load flashcards
+          </h2>
+          <p className="text-muted-foreground mb-6">{reviewState.error}</p>
+          <Button onClick={() => (window.location.href = "/create")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Create
+          </Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="ghost" asChild>
-            <Link href="/create" className="flex items-center gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Create
-            </Link>
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => (window.location.href = "/create")}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Create
           </Button>
         </div>
 
-        <ReviewHeader
-          cardsCount={cards.length}
-          selectedCount={selectedCards.size}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onBulkDelete={bulkDeleteCards}
-          onClearSelection={clearSelection}
-          bulkOperationLoading={bulkOperationLoading}
-        />
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Review & Edit Flashcards
+        </h1>
+        <p className="text-muted-foreground text-lg">
+          Review your generated flashcards and make any adjustments before
+          saving
+        </p>
       </div>
 
-      {/* Error Display - for non-critical errors */}
-      {error && cards.length > 0 && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearError}
-              className="ml-2 h-auto p-0 text-destructive hover:text-destructive"
-            >
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Bulk Actions */}
-      {viewMode === "edit" && (
-        <BulkActions
-          cardsCount={cards.length}
-          selectedCount={selectedCards.size}
-          onSelectAll={selectAllCards}
-          onClearSelection={clearSelection}
-          onAddCard={addNewCard}
-        />
-      )}
-
-      {/* Cards List */}
-      <CardsList
-        cards={cards}
-        viewMode={viewMode}
-        selectedCards={selectedCards}
-        editStates={editStates}
-        onToggleSelection={toggleCardSelection}
-        onStartEditing={startEditing}
-        onCancelEditing={cancelEditing}
-        onSaveCard={saveCard}
-        onDeleteCard={deleteCard}
-        onUpdateEditState={updateEditState}
-      />
-
-      {/* Save Section */}
-      {cards.length > 0 && (
-        <SaveSection
-          cards={cards}
-          isSaving={isSaving}
-          saveProgress={saveProgress}
-          onSave={handleSaveSet}
-          onCancel={() => router.push("/create")}
-        />
-      )}
-
-      {/* Empty State */}
-      {cards.length === 0 && !loading && !error && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">No flashcards to review.</p>
-          <LoadingButton onClick={() => router.push("/create")}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back to Create
-          </LoadingButton>
-        </div>
-      )}
+      {/* Main Review Container */}
+      <ReviewContainer {...reviewState} />
     </div>
   );
 }
