@@ -3,17 +3,18 @@ import { useRouter } from "next/navigation";
 import { useLoadingState } from "@/hooks/shared/useLoadingState";
 import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { useGenerationProgress } from "@/hooks/create/flow/useGenerationProgress";
-import { CardsSessionStorage } from "@/lib/storage/CardsSessionStorage";
 import { extractTextFromFile } from "@/lib/api/content";
+import { createSet } from "@/lib/api/sets";
 import type {
   ContentAnalysis,
   CreateFlowState,
+  PreviewState,
   UseCreateFlowReturn,
 } from "@/lib/types/create";
 
 /**
- * Main coordinating hook for the create flow
- * Manages state across all create flow steps and coordinates between components
+ * Simplified create flow hook for alpha release
+ * Manages state across the simplified 3-step flow: upload → generate → preview
  */
 export function useCreateFlow(): UseCreateFlowReturn {
   const router = useRouter();
@@ -22,6 +23,7 @@ export function useCreateFlow(): UseCreateFlowReturn {
     "file-upload",
     "text-extraction",
     "generation",
+    "saving",
   ]);
 
   const { showError, clearError, hasError } = useErrorHandler();
@@ -38,6 +40,18 @@ export function useCreateFlow(): UseCreateFlowReturn {
     source: "file",
     isExtracting: false,
     cancelledFileUrls: new Set(),
+  });
+
+  const [previewState, setPreviewState] = useState<PreviewState>({
+    cards: [],
+    analysis: null,
+    setName: "",
+    isSaving: false,
+    saveProgress: 0,
+    error: null,
+    isAnalysisExpanded: false,
+    savedSetId: undefined,
+    showSuccessState: false,
   });
 
   // Handle file upload completion
@@ -140,33 +154,38 @@ export function useCreateFlow(): UseCreateFlowReturn {
     setState((prev) => ({
       ...prev,
       step: "generating",
-      error: undefined, // Clear any previous errors
+      error: undefined,
     }));
 
     setLoading("generation", true);
     clearError();
 
     try {
-      // Generate cards (includes analysis step now or reuses existing analysis)
+      // Generate cards (includes analysis step)
       const result = await generateFlashcards(text, analysisToReuse);
 
       // Store the analysis for potential retries
       setState((prev) => ({ ...prev, lastAnalysis: result.analysis }));
 
-      // Save to session storage for review page with analysis
-      CardsSessionStorage.save(result.cards, text, result.analysis);
+      // Move to preview step with generated cards and analysis
+      setPreviewState({
+        cards: result.cards,
+        analysis: result.analysis,
+        setName: "",
+        isSaving: false,
+        saveProgress: 0,
+        error: null,
+        isAnalysisExpanded: false,
+        savedSetId: undefined,
+        showSuccessState: false,
+      });
 
-      setState((prev) => ({ ...prev, step: "complete" }));
+      setState((prev) => ({ ...prev, step: "preview" }));
       setLoading("generation", false);
-
-      // Redirect to review after brief success display
-      setTimeout(() => {
-        router.push("/create/review");
-      }, 2000);
     } catch (error) {
       setLoading("generation", false);
 
-      // Handle cancellation gracefully - show success message
+      // Handle cancellation gracefully
       if (error instanceof Error && error.name === "CancellationError") {
         console.log("🔄 Generation was cancelled, returning to upload");
         setState((prev) => ({
@@ -208,6 +227,60 @@ export function useCreateFlow(): UseCreateFlowReturn {
     handleGenerateCards(state.extractedText, state.lastAnalysis);
   };
 
+  const handleSaveSet = async (setName: string) => {
+    setPreviewState((prev) => ({
+      ...prev,
+      isSaving: true,
+      saveProgress: 0,
+      error: null,
+    }));
+
+    setLoading("saving", true);
+
+    try {
+      // Convert GeneratedCards to CreateFlashcard format for API
+      const cardsForSaving = previewState.cards.map((card) => ({
+        question: card.question,
+        answer: card.answer,
+      }));
+
+      // Simulate progress updates
+      setPreviewState((prev) => ({ ...prev, saveProgress: 25 }));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      setPreviewState((prev) => ({ ...prev, saveProgress: 50 }));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      setPreviewState((prev) => ({ ...prev, saveProgress: 75 }));
+
+      // Save the set
+      const result = await createSet(setName, cardsForSaving);
+
+      setPreviewState((prev) => ({ 
+        ...prev, 
+        saveProgress: 100,
+        isSaving: false,
+        savedSetId: result.setId,
+        showSuccessState: true,
+      }));
+      setLoading("saving", false);
+
+      // Don't auto-redirect - show success state with options
+    } catch (error) {
+      setLoading("saving", false);
+      
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save flashcard set";
+
+      setPreviewState((prev) => ({
+        ...prev,
+        isSaving: false,
+        saveProgress: 0,
+        error: errorMessage,
+      }));
+    }
+  };
+
   const handleStartOver = () => {
     setState({
       step: "upload",
@@ -220,8 +293,38 @@ export function useCreateFlow(): UseCreateFlowReturn {
       cancelledFileUrls: new Set(),
     });
 
+    setPreviewState({
+      cards: [],
+      analysis: null,
+      setName: "",
+      isSaving: false,
+      saveProgress: 0,
+      error: null,
+      isAnalysisExpanded: false,
+      savedSetId: undefined,
+      showSuccessState: false,
+    });
+
     clearError();
-    CardsSessionStorage.clear();
+  };
+
+  const handleToggleAnalysis = () => {
+    setPreviewState((prev) => ({
+      ...prev,
+      isAnalysisExpanded: !prev.isAnalysisExpanded,
+    }));
+  };
+
+  const handleNavigateToEdit = () => {
+    if (previewState.savedSetId) {
+      router.push(`/sets/${previewState.savedSetId}/edit`);
+    }
+  };
+
+  const handleNavigateToStudy = () => {
+    if (previewState.savedSetId) {
+      router.push(`/study/${previewState.savedSetId}`);
+    }
   };
 
   const handleUploadCancelled = (fileUrl?: string) => {
@@ -240,12 +343,17 @@ export function useCreateFlow(): UseCreateFlowReturn {
       error: state.error || (hasError ? "An error occurred" : undefined),
     },
     generationState,
+    previewState,
     handleFileUploaded,
     handleTextInput,
     handleStartOver,
     handleRetryGeneration,
     handleUploadCancelled,
     handleCancelGeneration: cancelGeneration,
+    handleSaveSet,
+    handleToggleAnalysis,
+    handleNavigateToEdit,
+    handleNavigateToStudy,
     clearError,
   };
 }

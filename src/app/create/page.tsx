@@ -34,12 +34,17 @@ export default function CreatePage() {
       <CreateFlowContainer
         state={createFlow.state}
         generationState={createFlow.generationState}
+        previewState={createFlow.previewState}
         onFileUploaded={createFlow.handleFileUploaded}
         onTextInput={createFlow.handleTextInput}
         onUploadCancelled={createFlow.handleUploadCancelled}
         onStartOver={createFlow.handleStartOver}
         onRetryGeneration={createFlow.handleRetryGeneration}
         onCancelGeneration={createFlow.handleCancelGeneration}
+        onSaveSet={createFlow.handleSaveSet}
+        onToggleAnalysis={createFlow.handleToggleAnalysis}
+        onNavigateToEdit={createFlow.handleNavigateToEdit}
+        onNavigateToStudy={createFlow.handleNavigateToStudy}
       />
     </div>
   );
