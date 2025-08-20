@@ -1,12 +1,8 @@
-import type {
-  Flashcard,
-  GeneratedCard,
-  ReviewFlashcard,
-} from "@/lib/types/flashcards";
+import type { GeneratedCard } from "@/lib/types/flashcards";
 
 // === CREATE FLOW STATE TYPES ===
 
-export type FlowStep = "upload" | "analyzing" | "generating" | "complete";
+export type FlowStep = "upload" | "analyzing" | "generating" | "preview";
 
 export interface CreateFlowState {
   step: FlowStep;
@@ -95,118 +91,13 @@ export interface GenerationResponse {
   };
 }
 
-// === CARD EDITING TYPES ===
+// === PREVIEW TYPES ===
 
-export interface CardEditState {
-  question: string;
-  answer: string;
-}
-
-export interface EditStatesMap {
-  [cardId: string]: CardEditState;
-}
-
-// === SELECTION TYPES ===
-
-export interface SelectionState {
-  selectedCards: Set<string>;
-  isSelectingAll: boolean;
-  selectionMode: "individual" | "bulk";
-}
-
-// === REFINEMENT TYPES ===
-
-export type CardRefinementInstruction =
-  | "make_harder"
-  | "add_examples"
-  | "add_context"
-  | "fix_grammar"
-  | "make_clearer"
-  | "custom";
-
-export interface CardRefinementOption {
-  instruction: CardRefinementInstruction;
-  label: string;
-  description: string;
-}
-
-export interface CardRefinementRequest {
-  originalCard: Flashcard;
-  instruction: CardRefinementInstruction;
-  context?: string;
-  contentType?: string;
-}
-
-export interface CardRefinementResult {
-  question: string;
-  answer: string;
-}
-
-export interface CardRefinementState {
-  regeneratingCards: Set<string>;
-  error: string | null;
-}
-
-// === BULK IMPROVEMENT TYPES ===
-
-export type BulkImprovementType =
-  | "make_harder"
-  | "make_easier"
-  | "add_examples"
-  | "add_context"
-  | "diversify_questions"
-  | "improve_clarity"
-  | "add_more_cards"
-  | "fix_grammar"
-  | "custom";
-
-export interface BulkImprovementOption {
-  type: BulkImprovementType;
-  label: string;
-  description: string;
-  requiresTargetCount?: boolean;
-}
-
-export interface BulkImprovementRequest {
-  selectedCards: Array<Flashcard>;
-  improvementType: BulkImprovementType;
-  customInstruction?: string;
-  targetCardCount?: number;
-  context?: string;
-  contentType?: string;
-}
-
-export interface BulkImprovementResult {
-  improvedCards: Array<GeneratedCard>;
-  addedCards?: Array<GeneratedCard>;
-}
-
-export interface BulkImprovementState {
-  isImproving: boolean;
-  progress: number;
-  currentOperation: string;
-  error: string | null;
-}
-
-// === AI SUGGESTIONS TYPES ===
-
-export interface AISuggestion {
-  id: string;
-  type: "difficulty" | "coverage" | "examples" | "clarity" | "count";
-  title: string;
-  description: string;
-  instruction: BulkImprovementType;
-  priority: "high" | "medium" | "low";
-  applied: boolean;
-  targetCardCount?: number;
-  requiresSelection?: boolean;
-}
-
-export interface AISuggestionsState {
-  suggestions: AISuggestion[];
-  isGenerating: boolean;
-  appliedSuggestions: Set<string>;
-  generatedSuggestionTypes: Set<string>; // Track what types we've suggested before
+export interface PreviewState {
+  cards: GeneratedCard[];
+  setName: string;
+  isSaving: boolean;
+  saveProgress: number;
   error: string | null;
 }
 
@@ -283,59 +174,21 @@ export interface TextExtractionState {
   error?: string;
 }
 
-// === REVIEW PAGE STATE ===
-
-export interface ReviewPageState {
-  cards: ReviewFlashcard[];
-  loading: boolean;
-  error: string | null;
-  analysis: ContentAnalysis | null;
-  sourceText: string;
-  editStates: EditStatesMap;
-  selectedCards: Set<string>;
-  isSaving: boolean;
-  saveProgress: number;
-}
 
 // === HOOK RETURN TYPES ===
 
 export interface UseCreateFlowReturn {
   state: CreateFlowState;
   generationState: GenerationState;
+  previewState: PreviewState;
   handleFileUploaded: (url: string, fileName: string) => Promise<void>;
   handleTextInput: (text: string) => Promise<void>;
   handleStartOver: () => void;
   handleRetryGeneration: () => void;
   handleUploadCancelled: (fileUrl?: string) => void;
   handleCancelGeneration: () => void;
+  handleSaveSet: (setName: string) => Promise<void>;
   clearError: () => void;
-}
-
-export interface UseCardManagerReturn {
-  cards: ReviewFlashcard[];
-  editStates: EditStatesMap;
-  startEditing: (cardId: string) => void;
-  cancelEditing: (cardId: string) => void;
-  saveCard: (cardId: string) => Promise<void>;
-  deleteCard: (cardId: string) => Promise<void>;
-  addNewCard: () => void;
-  updateEditState: (
-    cardId: string,
-    field: "question" | "answer",
-    value: string
-  ) => void;
-  validateCard: (cardId: string) => CardValidation;
-  isCardEditing: (cardId: string) => boolean;
-}
-
-export interface UseCardSelectionReturn {
-  selectedCards: Set<string>;
-  toggleCardSelection: (cardId: string) => void;
-  selectAllCards: () => void;
-  clearSelection: () => void;
-  isCardSelected: (cardId: string) => boolean;
-  selectedCount: number;
-  bulkDeleteCards: () => Promise<void>;
 }
 
 // === CREATE FLOW CONSTANTS ===
@@ -400,88 +253,3 @@ export const GENERATION_STAGES: GenerationStage[] = [
   },
 ];
 
-// === CARD REFINEMENT CONSTANTS ===
-
-export const CARD_REFINEMENT_OPTIONS: CardRefinementOption[] = [
-  {
-    instruction: "make_harder",
-    label: "Make Harder",
-    description: "Increase difficulty with more complex questions",
-  },
-  {
-    instruction: "add_examples",
-    label: "Add Examples",
-    description: "Include specific examples in the answer",
-  },
-  {
-    instruction: "add_context",
-    label: "Add Context",
-    description: "Provide more background information",
-  },
-  {
-    instruction: "fix_grammar",
-    label: "Fix Grammar",
-    description: "Improve grammar and clarity",
-  },
-  {
-    instruction: "make_clearer",
-    label: "Make Clearer",
-    description: "Simplify and clarify the language",
-  },
-  {
-    instruction: "custom",
-    label: "Custom...",
-    description: "Provide specific instructions",
-  },
-];
-
-// === BULK IMPROVEMENT CONSTANTS ===
-
-export const BULK_IMPROVEMENT_OPTIONS: BulkImprovementOption[] = [
-  {
-    type: "make_harder",
-    label: "Make All Harder",
-    description: "Increase difficulty across all selected cards",
-  },
-  {
-    type: "make_easier",
-    label: "Make Easier",
-    description: "Simplify questions for better comprehension",
-  },
-  {
-    type: "add_examples",
-    label: "Add Examples",
-    description: "Include examples in answers where helpful",
-  },
-  {
-    type: "add_context",
-    label: "Add Context",
-    description: "Provide more background information",
-  },
-  {
-    type: "diversify_questions",
-    label: "Diversify Questions",
-    description: "Create more varied question types",
-  },
-  {
-    type: "improve_clarity",
-    label: "Improve Clarity",
-    description: "Make questions and answers clearer",
-  },
-  {
-    type: "add_more_cards",
-    label: "Add More Cards",
-    description: "Generate additional cards for better coverage",
-    requiresTargetCount: true,
-  },
-  {
-    type: "fix_grammar",
-    label: "Fix Grammar",
-    description: "Correct grammar and improve language",
-  },
-  {
-    type: "custom",
-    label: "Custom Instruction",
-    description: "Provide specific improvement instructions",
-  },
-];

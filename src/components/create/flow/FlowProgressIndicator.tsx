@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, Zap, FileText } from "lucide-react";
+import { Upload, Zap, Eye } from "lucide-react";
 import type { FlowProgressIndicatorProps } from "@/lib/types/components";
 import type { FlowStep } from "@/lib/types/create";
 
@@ -25,10 +25,10 @@ const DEFAULT_STEPS: StepConfig[] = [
     description: "AI analyzes content and creates flashcards",
   },
   {
-    step: "complete",
-    label: "Review",
-    icon: FileText,
-    description: "Review and edit your generated flashcards",
+    step: "preview",
+    label: "Preview",
+    icon: Eye,
+    description: "Review your flashcards and save your set",
   },
 ];
 
