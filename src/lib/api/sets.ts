@@ -1,6 +1,24 @@
 import type { CreateFlashcard } from "@/lib/types/flashcards";
 
 /**
+ * Get all flashcard sets for the current user
+ */
+export async function getSets(): Promise<Array<{
+  id: string;
+  name: string;
+  _count: { cards: number };
+}>> {
+  const response = await fetch("/api/sets");
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to fetch sets");
+  }
+  
+  return response.json();
+}
+
+/**
  * Create a new flashcard set with cards
  */
 export async function createSet(

@@ -73,8 +73,9 @@ export function useLoadingState(
   };
 }
 
-// Common loading state keys used throughout the create flow
+// Common loading state keys used throughout the application
 export const LOADING_STATES = {
+  // Create flow
   GENERATION: "generation",
   EXTRACTION: "extraction",
   ANALYSIS: "analysis",
@@ -84,6 +85,10 @@ export const LOADING_STATES = {
   SAVING: "saving",
   UPLOADING: "uploading",
   DELETING: "deleting",
+  // Dashboard
+  DASHBOARD_INIT: "dashboard_init",
+  SETS_FETCH: "sets_fetch",
+  SET_CREATE: "set_create",
 } as const;
 
 export type LoadingStateKey =
