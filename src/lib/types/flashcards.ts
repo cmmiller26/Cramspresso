@@ -79,3 +79,63 @@ export interface StudySession {
   // Overall missed cards (across all rounds)
   allMissedCards: Flashcard[]; // Cards that still need work
 }
+
+// === DASHBOARD TYPES ===
+
+export interface DashboardStats {
+  totalSets: number;
+  totalCards: number;
+  studySessionsThisWeek: number;
+  averageScore: number;
+  averageCardsPerSet: number;
+}
+
+export interface SetGridItem {
+  id: string;
+  name: string;
+  cardCount: number;
+  lastStudied?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SetItem {
+  id: string;
+  name: string;
+  _count: { cards: number };
+}
+
+// === SET MANAGEMENT STATE TYPES ===
+
+export interface SetEditingState {
+  isEditing: boolean;
+  editingCardId?: string;
+  hasChanges: boolean;
+  unsavedChanges: Record<string, Partial<Flashcard>>;
+}
+
+export interface CardUpdatePayload {
+  question?: string;
+  answer?: string;
+}
+
+export interface CardEditorState {
+  editingCardId: string | null;
+  editingQuestion: string;
+  editingAnswer: string;
+  updatingCard: boolean;
+  deletingCardId: string | null;
+}
+
+export interface NewCardState {
+  newQuestion: string;
+  newAnswer: string;
+  addingCard: boolean;
+}
+
+export interface SetOperationState {
+  saving: boolean;
+  deleting: boolean;
+  loading: boolean;
+  error?: string;
+}

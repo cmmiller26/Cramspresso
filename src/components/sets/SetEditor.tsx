@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Flashcard } from "@/lib/types/flashcards";
+import type { Flashcard } from "@/lib/types/flashcards";
 import { Edit, Trash2, Plus, Save, X } from "lucide-react";
 import {
   AlertDialog,

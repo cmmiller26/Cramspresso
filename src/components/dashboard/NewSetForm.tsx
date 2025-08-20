@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { CreateFlashcard } from "@/lib/types/flashcards";
+import type { CreateFlashcard } from "@/lib/types/flashcards";
 import * as setsApi from "@/lib/api/sets";
 import { Loader2, X } from "lucide-react";
 
