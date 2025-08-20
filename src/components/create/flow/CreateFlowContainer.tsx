@@ -22,6 +22,9 @@ interface CreateFlowContainerProps {
   onRetryGeneration: () => void;
   onCancelGeneration: () => void;
   onSaveSet: (setName: string) => Promise<void>;
+  onToggleAnalysis: () => void;
+  onNavigateToEdit: () => void;
+  onNavigateToStudy: () => void;
   className?: string;
 }
 
@@ -57,6 +60,9 @@ export function CreateFlowContainer({
   onRetryGeneration,
   onCancelGeneration,
   onSaveSet,
+  onToggleAnalysis,
+  onNavigateToEdit,
+  onNavigateToStudy,
   className = "",
 }: CreateFlowContainerProps) {
   return (
@@ -97,10 +103,18 @@ export function CreateFlowContainer({
         {state.step === "preview" && (
           <PreviewStep
             cards={previewState.cards}
+            analysis={previewState.analysis}
             onSave={onSaveSet}
             isSaving={previewState.isSaving}
             saveProgress={previewState.saveProgress}
             error={previewState.error || undefined}
+            isAnalysisExpanded={previewState.isAnalysisExpanded}
+            onToggleAnalysis={onToggleAnalysis}
+            showSuccessState={previewState.showSuccessState}
+            savedSetId={previewState.savedSetId}
+            onNavigateToEdit={onNavigateToEdit}
+            onNavigateToStudy={onNavigateToStudy}
+            onStartOver={onStartOver}
           />
         )}
       </div>

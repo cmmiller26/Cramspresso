@@ -42,6 +42,9 @@ export default function CreatePage() {
         onRetryGeneration={createFlow.handleRetryGeneration}
         onCancelGeneration={createFlow.handleCancelGeneration}
         onSaveSet={createFlow.handleSaveSet}
+        onToggleAnalysis={createFlow.handleToggleAnalysis}
+        onNavigateToEdit={createFlow.handleNavigateToEdit}
+        onNavigateToStudy={createFlow.handleNavigateToStudy}
       />
     </div>
   );

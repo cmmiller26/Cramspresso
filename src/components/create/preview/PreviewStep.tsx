@@ -5,23 +5,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/shared/LoadingButton";
+import { AnalysisDisplay } from "@/components/create/generation/AnalysisDisplay";
+import { CheckCircle, Edit, Play, RotateCcw } from "lucide-react";
 import type { GeneratedCard } from "@/lib/types/flashcards";
+import type { ContentAnalysis } from "@/lib/types/create";
 
 interface PreviewStepProps {
   cards: GeneratedCard[];
+  analysis: ContentAnalysis | null;
   onSave: (setName: string) => Promise<void>;
   isSaving: boolean;
   saveProgress: number;
   error?: string;
+  isAnalysisExpanded: boolean;
+  onToggleAnalysis: () => void;
+  showSuccessState: boolean;
+  savedSetId?: string;
+  onNavigateToEdit: () => void;
+  onNavigateToStudy: () => void;
+  onStartOver: () => void;
 }
 
 export const PreviewStep = memo(function PreviewStep({
   cards,
+  analysis,
   onSave,
   isSaving,
   saveProgress,
   error,
+  isAnalysisExpanded,
+  onToggleAnalysis,
+  showSuccessState,
+  savedSetId,
+  onNavigateToEdit,
+  onNavigateToStudy,
+  onStartOver,
 }: PreviewStepProps) {
   const [setName, setSetName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
@@ -43,6 +63,57 @@ export const PreviewStep = memo(function PreviewStep({
     await onSave(trimmedName);
   };
 
+  // Success State
+  if (showSuccessState && savedSetId) {
+    return (
+      <div className="text-center space-y-6 py-8">
+        <div className="space-y-4">
+          <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-foreground">
+              Flashcard Set Created!
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Your set <span className="font-semibold">&ldquo;{setName}&rdquo;</span> has been saved with{" "}
+              <span className="font-semibold">{cards.length} flashcards</span>.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-4 justify-center flex-wrap">
+          <LoadingButton 
+            onClick={onNavigateToEdit}
+            className="gap-2"
+            variant="default"
+          >
+            <Edit className="w-4 h-4" />
+            Edit Cards
+          </LoadingButton>
+          <LoadingButton 
+            onClick={onNavigateToStudy}
+            className="gap-2"
+            variant="secondary"
+          >
+            <Play className="w-4 h-4" />
+            Start Studying
+          </LoadingButton>
+        </div>
+
+        <div className="pt-4 border-t">
+          <Button 
+            onClick={onStartOver}
+            variant="ghost"
+            className="gap-2 text-muted-foreground"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Create Another Set
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Preview State
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -51,9 +122,20 @@ export const PreviewStep = memo(function PreviewStep({
           Preview Your Flashcards
         </h2>
         <p className="text-muted-foreground">
-          Review your {cards.length} generated flashcards and name your set
+          Review your {cards.length} generated flashcards and analysis
         </p>
       </div>
+
+      {/* Content Analysis */}
+      {analysis && (
+        <AnalysisDisplay
+          analysis={analysis}
+          isExpanded={isAnalysisExpanded}
+          onToggle={onToggleAnalysis}
+          showExpandButton={true}
+          compact={false}
+        />
+      )}
 
       {/* Set Name Input */}
       <Card>

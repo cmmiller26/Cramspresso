@@ -44,10 +44,14 @@ export function useCreateFlow(): UseCreateFlowReturn {
 
   const [previewState, setPreviewState] = useState<PreviewState>({
     cards: [],
+    analysis: null,
     setName: "",
     isSaving: false,
     saveProgress: 0,
     error: null,
+    isAnalysisExpanded: false,
+    savedSetId: undefined,
+    showSuccessState: false,
   });
 
   // Handle file upload completion
@@ -163,13 +167,17 @@ export function useCreateFlow(): UseCreateFlowReturn {
       // Store the analysis for potential retries
       setState((prev) => ({ ...prev, lastAnalysis: result.analysis }));
 
-      // Move to preview step with generated cards
+      // Move to preview step with generated cards and analysis
       setPreviewState({
         cards: result.cards,
+        analysis: result.analysis,
         setName: "",
         isSaving: false,
         saveProgress: 0,
         error: null,
+        isAnalysisExpanded: false,
+        savedSetId: undefined,
+        showSuccessState: false,
       });
 
       setState((prev) => ({ ...prev, step: "preview" }));
@@ -248,11 +256,16 @@ export function useCreateFlow(): UseCreateFlowReturn {
       // Save the set
       const result = await createSet(setName, cardsForSaving);
 
-      setPreviewState((prev) => ({ ...prev, saveProgress: 100 }));
+      setPreviewState((prev) => ({ 
+        ...prev, 
+        saveProgress: 100,
+        isSaving: false,
+        savedSetId: result.setId,
+        showSuccessState: true,
+      }));
       setLoading("saving", false);
 
-      // Redirect to the newly created set
-      router.push(`/sets/${result.setId}`);
+      // Don't auto-redirect - show success state with options
     } catch (error) {
       setLoading("saving", false);
       
@@ -282,13 +295,36 @@ export function useCreateFlow(): UseCreateFlowReturn {
 
     setPreviewState({
       cards: [],
+      analysis: null,
       setName: "",
       isSaving: false,
       saveProgress: 0,
       error: null,
+      isAnalysisExpanded: false,
+      savedSetId: undefined,
+      showSuccessState: false,
     });
 
     clearError();
+  };
+
+  const handleToggleAnalysis = () => {
+    setPreviewState((prev) => ({
+      ...prev,
+      isAnalysisExpanded: !prev.isAnalysisExpanded,
+    }));
+  };
+
+  const handleNavigateToEdit = () => {
+    if (previewState.savedSetId) {
+      router.push(`/sets/${previewState.savedSetId}/edit`);
+    }
+  };
+
+  const handleNavigateToStudy = () => {
+    if (previewState.savedSetId) {
+      router.push(`/study/${previewState.savedSetId}`);
+    }
   };
 
   const handleUploadCancelled = (fileUrl?: string) => {
@@ -315,6 +351,9 @@ export function useCreateFlow(): UseCreateFlowReturn {
     handleUploadCancelled,
     handleCancelGeneration: cancelGeneration,
     handleSaveSet,
+    handleToggleAnalysis,
+    handleNavigateToEdit,
+    handleNavigateToStudy,
     clearError,
   };
 }

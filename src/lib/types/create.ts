@@ -95,10 +95,14 @@ export interface GenerationResponse {
 
 export interface PreviewState {
   cards: GeneratedCard[];
+  analysis: ContentAnalysis | null;
   setName: string;
   isSaving: boolean;
   saveProgress: number;
   error: string | null;
+  isAnalysisExpanded: boolean;
+  savedSetId?: string;
+  showSuccessState: boolean;
 }
 
 // === SAVE OPERATION TYPES ===
@@ -188,6 +192,9 @@ export interface UseCreateFlowReturn {
   handleUploadCancelled: (fileUrl?: string) => void;
   handleCancelGeneration: () => void;
   handleSaveSet: (setName: string) => Promise<void>;
+  handleToggleAnalysis: () => void;
+  handleNavigateToEdit: () => void;
+  handleNavigateToStudy: () => void;
   clearError: () => void;
 }
 
