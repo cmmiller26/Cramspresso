@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export function SampleCard() {
+export const SampleCard = memo(function SampleCard() {
   const [isFlipped, setIsFlipped] = useState(false);
 
   const sampleCards = [
@@ -149,4 +149,4 @@ export function SampleCard() {
       </div>
     </section>
   );
-}
+});
