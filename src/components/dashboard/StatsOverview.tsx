@@ -5,18 +5,7 @@ import { StatsOverviewSkeleton } from "@/components/shared/SkeletonLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsOverviewError } from "../shared/ErrorStates";
 
-interface SetItem {
-  id: string;
-  name: string;
-  _count: { cards: number };
-}
-
-interface StatsOverviewProps {
-  sets: SetItem[];
-  loading?: boolean;
-  error?: string | null;
-  onRetry?: () => void;
-}
+import type { StatsOverviewProps } from "@/lib/types/components";
 
 export function StatsOverview({
   sets,

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Flashcard } from "@/lib/types/flashcards";
+import { Skeleton } from "@/components/shared/SkeletonLoader";
+import type { Flashcard } from "@/lib/types/flashcards";
 import { Search } from "lucide-react";
 
 interface Props {
@@ -12,32 +13,71 @@ interface Props {
   loading?: boolean;
 }
 
-export function CardList({
+// Individual card component with React.memo for performance
+const CardItem = memo(function CardItem({ card }: { card: Flashcard }) {
+  return (
+    <Card className="border-border hover:bg-muted/50 transition-colors">
+      <CardContent className="p-4">
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-start gap-2">
+              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                Q
+              </span>
+              <p className="text-foreground flex-1">{card.question}</p>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-start gap-2">
+              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                A
+              </span>
+              <p className="text-foreground flex-1">{card.answer}</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+export const CardList = memo(function CardList({
   cards,
   variant = "overview",
   loading = false,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredCards = cards.filter(
-    (card) =>
-      card.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      card.answer.toLowerCase().includes(searchTerm.toLowerCase())
+  // Memoize filtered cards for performance with large sets
+  const filteredCards = useMemo(
+    () => cards.filter(
+      (card) =>
+        card.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        card.answer.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [cards, searchTerm]
   );
 
   if (loading) {
     return (
       <div className="space-y-3">
         {[...Array(3)].map((_, i) => (
-          <Card key={i} className="border-border">
-            <CardContent className="p-4">
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-                <div className="h-4 bg-muted rounded w-full"></div>
-                <div className="h-4 bg-muted rounded w-1/2"></div>
+          <div key={i} className="bg-card border border-border rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-6 w-6" variant="rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-6 w-6" variant="rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -58,7 +98,7 @@ export function CardList({
 
   return (
     <div className="space-y-4">
-      {/* Search */}
+      {/* Search - Only show for sets with more than 3 cards */}
       {cards.length > 3 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -79,31 +119,10 @@ export function CardList({
           </div>
         ) : (
           filteredCards.map((card, index) => (
-            <Card
+            <CardItem
               key={card.id ?? `card-${index}`}
-              className="border-border hover:bg-muted/50 transition-colors"
-            >
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                        Q
-                      </span>
-                      <p className="text-foreground flex-1">{card.question}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                        A
-                      </span>
-                      <p className="text-foreground flex-1">{card.answer}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              card={card}
+            />
           ))
         )}
       </div>
@@ -116,4 +135,4 @@ export function CardList({
       )}
     </div>
   );
-}
+});

@@ -6,9 +6,14 @@ import { useAuth } from "@clerk/nextjs";
 import { NewSetForm } from "@/components/dashboard/NewSetForm";
 import { SetGrid } from "@/components/dashboard/SetGrid";
 import { StatsOverview } from "@/components/dashboard/StatsOverview";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { useLoadingState, LOADING_STATES } from "@/hooks/shared/useLoadingState";
+import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Upload } from "lucide-react";
+import * as setsApi from "@/lib/api/sets";
 
 interface SetItem {
   id: string;
@@ -19,6 +24,11 @@ interface SetItem {
 export default function Dashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
+  const { setLoading, isLoading } = useLoadingState([
+    LOADING_STATES.DASHBOARD_INIT,
+    LOADING_STATES.SETS_FETCH
+  ]);
+  const { showError, clearError } = useErrorHandler();
 
   const wasSignedInRef = useRef(false);
 
@@ -36,29 +46,45 @@ export default function Dashboard() {
   }, [isLoaded, isSignedIn, router]);
 
   const [sets, setSets] = useState<SetItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showNewSetForm, setShowNewSetForm] = useState(false);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    setLoading(true);
-
-    fetch("/api/sets")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch sets");
-        return res.json();
-      })
-      .then(setSets)
-      .catch((err) => {
+    const fetchSets = async () => {
+      try {
+        setLoading(LOADING_STATES.SETS_FETCH, true);
+        const sets = await setsApi.getSets();
+        setSets(sets);
+      } catch (err) {
         console.error(err);
-        setError(err instanceof Error ? err.message : "Unknown error");
-      })
-      .finally(() => setLoading(false));
-  }, [isLoaded, isSignedIn]);
+        showError(
+          "GENERIC_ERROR",
+          err instanceof Error ? err.message : "Failed to load flashcard sets",
+          {
+            onRetry: fetchSets,
+            onDismiss: clearError,
+          }
+        );
+      } finally {
+        setLoading(LOADING_STATES.SETS_FETCH, false);
+      }
+    };
 
-  if (!isLoaded || !isSignedIn) return <p>Redirecting to sign-in...</p>;
+    fetchSets();
+  }, [isLoaded, isSignedIn, setLoading, showError, clearError]);
+
+  // Show loading for auth redirect
+  if (!isLoaded || !isSignedIn) {
+    return (
+      <main className="flex items-center justify-center min-h-screen bg-background">
+        <LoadingSpinner 
+          size="lg" 
+          text="Redirecting to sign-in..." 
+        />
+      </main>
+    );
+  }
 
   return (
     <>
@@ -74,14 +100,15 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-3">
             {/* New Upload Flow Button */}
-            <Button
-              onClick={() => router.push("/create")}
+            <LoadingButton
+              onClick={async () => router.push("/create")}
               className="w-fit"
               size="lg"
+              loadingText="Loading..."
             >
               <Upload className="h-4 w-4 mr-2" />
               Upload & Generate
-            </Button>
+            </LoadingButton>
             {/* Original Create Button (for manual sets) */}
             <Button
               variant="outline"
@@ -121,15 +148,19 @@ export default function Dashboard() {
         {/* Stats Overview */}
         <StatsOverview
           sets={sets}
-          loading={loading}
-          error={error}
+          loading={isLoading(LOADING_STATES.SETS_FETCH)}
+          error={null} // Errors are handled centrally now
           onRetry={() => window.location.reload()}
         />
 
         {/* Sets Grid */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Your Flashcard Sets</h2>
-          <SetGrid sets={sets} loading={loading} error={error} />
+          <SetGrid 
+            sets={sets} 
+            loading={isLoading(LOADING_STATES.SETS_FETCH)}
+            error={null} // Errors are handled centrally now
+          />
         </div>
       </main>
     </>

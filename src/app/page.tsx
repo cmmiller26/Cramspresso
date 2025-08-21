@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Hero } from "@/components/marketing/Hero";
 import { Features } from "@/components/marketing/Features";
 import { SampleCard } from "@/components/marketing/SampleCard";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export default function Home() {
   const { isSignedIn } = useAuth();
@@ -18,13 +19,14 @@ export default function Home() {
     }
   }, [isSignedIn, router]);
 
-  // Show loading or nothing while redirecting authenticated users
+  // Show loading while redirecting authenticated users
   if (isSignedIn) {
     return (
       <main className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <p className="text-muted-foreground">Redirecting to dashboard...</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Redirecting to dashboard..." 
+        />
       </main>
     );
   }

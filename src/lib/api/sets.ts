@@ -1,4 +1,47 @@
-import type { CreateFlashcard } from "@/lib/types/flashcards";
+import type { CreateFlashcard, Flashcard } from "@/lib/types/flashcards";
+
+interface SetData {
+  id: string;
+  name: string;
+  cards: Flashcard[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Get all flashcard sets for the current user
+ */
+export async function getSets(): Promise<Array<{
+  id: string;
+  name: string;
+  _count: { cards: number };
+}>> {
+  const response = await fetch("/api/sets");
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to fetch sets");
+  }
+  
+  return response.json();
+}
+
+/**
+ * Get a specific flashcard set by ID
+ */
+export async function getSetById(setId: string): Promise<SetData> {
+  const response = await fetch(`/api/sets/${setId}`);
+  
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Set not found");
+    }
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to load set");
+  }
+  
+  return response.json();
+}
 
 /**
  * Create a new flashcard set with cards

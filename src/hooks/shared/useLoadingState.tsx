@@ -73,8 +73,9 @@ export function useLoadingState(
   };
 }
 
-// Common loading state keys used throughout the create flow
+// Common loading state keys used throughout the application
 export const LOADING_STATES = {
+  // Create flow
   GENERATION: "generation",
   EXTRACTION: "extraction",
   ANALYSIS: "analysis",
@@ -84,6 +85,23 @@ export const LOADING_STATES = {
   SAVING: "saving",
   UPLOADING: "uploading",
   DELETING: "deleting",
+  // Dashboard
+  DASHBOARD_INIT: "dashboard_init",
+  SETS_FETCH: "sets_fetch",
+  SET_CREATE: "set_create",
+  // Set Management
+  SET_LOAD: "set_load",
+  SET_DELETE: "set_delete",
+  SET_NAME_UPDATE: "set_name_update",
+  CARD_ADD: "card_add",
+  CARD_UPDATE: "card_update",
+  CARD_DELETE: "card_delete",
+  // Study Mode
+  STUDY_INIT: "study_init",
+  STUDY_SHUFFLE: "study_shuffle",
+  STUDY_RESET: "study_reset",
+  STUDY_SAVE: "study_save",
+  STUDY_COMPLETE: "study_complete",
 } as const;
 
 export type LoadingStateKey =

@@ -1,8 +1,9 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
 import { ArrowLeft, Keyboard, AlertTriangle, X } from "lucide-react";
-import Link from "next/link";
 import { StudyCard } from "./StudyCard";
 import { StudyProgress } from "./StudyProgress";
 import { StudyControls } from "./StudyControls";
@@ -46,7 +47,7 @@ interface StudyInterfaceProps {
   onClearControlsError?: () => void;
 }
 
-export function StudyInterface({
+export const StudyInterface = memo(function StudyInterface({
   // Session and round data
   studySession,
   currentRound,
@@ -176,12 +177,18 @@ export function StudyInterface({
       {/* Header */}
       <div className="flex items-center mb-6">
         <div className="flex-1 flex justify-start">
-          <Link href={`/sets/${studySession.setId}`}>
-            <Button variant="ghost" size="sm" disabled={anyControlLoading}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Set
-            </Button>
-          </Link>
+          <LoadingButton
+            onClick={async () => {
+              window.location.href = `/sets/${studySession.setId}`;
+            }}
+            variant="ghost"
+            size="sm"
+            disabled={anyControlLoading}
+            loadingText="Loading..."
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Set
+          </LoadingButton>
         </div>
         <div className="flex-1 text-center">
           <h1 className="text-xl font-semibold text-foreground">
@@ -266,4 +273,4 @@ export function StudyInterface({
       </div>
     </div>
   );
-}
+});

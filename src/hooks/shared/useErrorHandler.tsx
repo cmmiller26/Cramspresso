@@ -20,7 +20,25 @@ export type ErrorType =
   | "AI_SUGGESTIONS_ERROR"
   | "UPLOAD_WARNING"
   | "CANCELLATION_SUCCESS"
-  | "GENERIC_ERROR";
+  | "GENERIC_ERROR"
+  // Set Management Error Types
+  | "SET_NOT_FOUND"
+  | "SET_LOAD_ERROR"
+  | "SET_DELETE_ERROR"
+  | "SET_NAME_UPDATE_ERROR"
+  | "CARD_ADD_ERROR"
+  | "CARD_UPDATE_ERROR"
+  | "CARD_DELETE_ERROR"
+  | "EDIT_UNSAVED_CARD"
+  | "EXPORT_NOT_IMPLEMENTED"
+  | "UPLOAD_GENERATION_ERROR"
+  | "NO_CARDS_GENERATED"
+  // Study Mode Error Types
+  | "STUDY_SET_NOT_FOUND"
+  | "STUDY_LOAD_ERROR"
+  | "STUDY_SHUFFLE_ERROR"
+  | "STUDY_RESET_ERROR"
+  | "STUDY_SAVE_ERROR";
 
 interface ErrorHandlerState {
   type: ErrorType | null;

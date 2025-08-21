@@ -1,6 +1,8 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/shared/SkeletonLoader";
 import { Calendar, Hash, Clock } from "lucide-react";
 
 interface Props {
@@ -11,7 +13,7 @@ interface Props {
   loading?: boolean;
 }
 
-export function SetOverview({
+export const SetOverview = memo(function SetOverview({
   setName,
   cardCount,
   createdAt,
@@ -22,10 +24,22 @@ export function SetOverview({
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="animate-pulse space-y-3">
-            <div className="h-8 bg-muted rounded w-3/4"></div>
-            <div className="h-4 bg-muted rounded w-1/2"></div>
-            <div className="h-4 bg-muted rounded w-1/3"></div>
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-3/4" />
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" variant="circular" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" variant="circular" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" variant="circular" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -59,4 +73,4 @@ export function SetOverview({
       </CardContent>
     </Card>
   );
-}
+});

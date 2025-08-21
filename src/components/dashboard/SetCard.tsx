@@ -1,7 +1,8 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eye, BookOpen } from "lucide-react";
@@ -16,7 +17,7 @@ interface SetCardProps {
   set: SetItem;
 }
 
-export function SetCard({ set }: SetCardProps) {
+export const SetCard = memo(function SetCard({ set }: SetCardProps) {
   const cardCount = set._count.cards;
 
   return (
@@ -32,21 +33,21 @@ export function SetCard({ set }: SetCardProps) {
       <CardContent>
         <div className="flex flex-col gap-2">
           <Link href={`/sets/${set.id}`} className="w-full">
-            <Button className="w-full">
+            <LoadingButton className="w-full" loadingText="Loading...">
               <Eye className="h-4 w-4 mr-2" />
               View Details
-            </Button>
+            </LoadingButton>
           </Link>
           {cardCount > 0 && (
             <Link href={`/study/${set.id}`} className="w-full">
-              <Button variant="outline" className="w-full">
+              <LoadingButton variant="outline" className="w-full" loadingText="Starting...">
                 <BookOpen className="h-4 w-4 mr-2" />
                 Study Now
-              </Button>
+              </LoadingButton>
             </Link>
           )}
         </div>
       </CardContent>
     </Card>
   );
-}
+});

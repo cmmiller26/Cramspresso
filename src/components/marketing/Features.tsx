@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { FileText, Brain, GraduationCap } from "lucide-react";
 
-export function Features() {
+export const Features = memo(function Features() {
   const features = [
     {
       icon: <FileText className="h-12 w-12 text-primary" />,
@@ -49,4 +50,4 @@ export function Features() {
       </div>
     </section>
   );
-}
+});

@@ -1,7 +1,11 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
+import { ErrorState } from "@/components/shared/ErrorStates";
+import { Skeleton } from "@/components/shared/SkeletonLoader";
 import { useRouter } from "next/navigation";
 import { BookOpen, Eye, Hash } from "lucide-react";
 
@@ -17,22 +21,14 @@ interface Props {
   error: string | null;
 }
 
-export function SetGrid({ sets, loading, error }: Props) {
+export const SetGrid = memo(function SetGrid({ sets, loading, error }: Props) {
   const router = useRouter();
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(6)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                <div className="h-6 bg-muted rounded w-3/4"></div>
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-                <div className="h-8 bg-muted rounded w-full"></div>
-              </div>
-            </CardContent>
-          </Card>
+          <Skeleton key={i} className="h-40" variant="rounded" />
         ))}
       </div>
     );
@@ -40,12 +36,11 @@ export function SetGrid({ sets, loading, error }: Props) {
 
   if (error) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground mb-4">
-          Error loading sets: {error}
-        </p>
-        <Button onClick={() => window.location.reload()}>Try Again</Button>
-      </div>
+      <ErrorState 
+        title="Failed to load flashcard sets"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
@@ -59,9 +54,9 @@ export function SetGrid({ sets, loading, error }: Props) {
             scratch.
           </p>
           <div className="flex gap-2 justify-center">
-            <Button onClick={() => router.push("/create")}>
+            <LoadingButton onClick={async () => router.push("/create")}>
               Upload & Generate
-            </Button>
+            </LoadingButton>
             <Button variant="outline" onClick={() => window.location.reload()}>
               Create Empty Set
             </Button>
@@ -94,25 +89,27 @@ export function SetGrid({ sets, loading, error }: Props) {
               {/* Actions */}
               <div className="flex gap-2">
                 {/* View Details - Primary Action */}
-                <Button
-                  onClick={() => router.push(`/sets/${set.id}`)}
+                <LoadingButton
+                  onClick={async () => router.push(`/sets/${set.id}`)}
                   className="flex-1"
                   size="sm"
+                  loadingText="Loading..."
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   View
-                </Button>
+                </LoadingButton>
 
                 {/* Quick Study */}
-                <Button
+                <LoadingButton
                   variant="outline"
-                  onClick={() => router.push(`/study/${set.id}`)}
+                  onClick={async () => router.push(`/study/${set.id}`)}
                   disabled={set._count.cards === 0}
                   size="sm"
+                  loadingText="Starting..."
                 >
                   <BookOpen className="h-4 w-4 mr-2" />
                   Study
-                </Button>
+                </LoadingButton>
               </div>
             </div>
           </CardContent>
@@ -120,4 +117,4 @@ export function SetGrid({ sets, loading, error }: Props) {
       ))}
     </div>
   );
-}
+});

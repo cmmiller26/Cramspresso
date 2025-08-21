@@ -1,23 +1,44 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/shared/LoadingButton";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 
 export function Hero() {
   const { isSignedIn } = useAuth();
   const router = useRouter();
+  const { showError, clearError, renderError, hasError } = useErrorHandler();
 
-  const handleGetStarted = () => {
-    if (isSignedIn) {
-      router.push("/dashboard");
-    } else {
-      router.push("/sign-up");
+  const handleGetStarted = async () => {
+    try {
+      if (isSignedIn) {
+        router.push("/dashboard");
+      } else {
+        router.push("/sign-up");
+      }
+    } catch {
+      showError(
+        "GENERIC_ERROR",
+        "Unable to navigate. Please try again.",
+        {
+          onRetry: handleGetStarted,
+          onDismiss: clearError,
+        }
+      );
     }
   };
 
   return (
     <section className="text-center space-y-6 py-12">
+      {/* Error display */}
+      {hasError && (
+        <div className="mb-6">
+          {renderError()}
+        </div>
+      )}
+      
       <div className="space-y-4">
         <h1 className="text-4xl font-bold text-foreground">
           Turn Your Documents into
@@ -30,13 +51,14 @@ export function Hero() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-        <Button
+        <LoadingButton
           onClick={handleGetStarted}
           size="lg"
           className="px-8 py-3 text-lg"
+          loadingText={isSignedIn ? "Loading Dashboard..." : "Setting Up..."}
         >
           {isSignedIn ? "Go to Dashboard" : "Get Started Free"}
-        </Button>
+        </LoadingButton>
         <Button
           variant="outline"
           size="lg"
