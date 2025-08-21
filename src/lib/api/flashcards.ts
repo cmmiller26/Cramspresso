@@ -43,7 +43,11 @@ export async function generateCards(
       } else if (response.status === 401) {
         errorMessage = "Authentication failed. Please refresh and try again.";
       } else if (response.status === 429) {
-        errorMessage = "Too many requests. Please wait a moment and try again.";
+        errorMessage = "AI service temporarily unavailable. Please try again in a moment.";
+      } else if (response.status === 502) {
+        errorMessage = "The AI service returned an invalid response. Please try again.";
+      } else if (response.status === 503) {
+        errorMessage = "Network error. Please check your connection and try again.";
       } else if (response.status >= 500) {
         errorMessage = "Server error. Please try again in a moment.";
       }

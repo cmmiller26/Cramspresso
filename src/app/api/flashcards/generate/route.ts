@@ -120,7 +120,21 @@ QUALITY GUIDELINES:
 - Avoid redundant or overly similar questions
 - Focus on understanding, not memorization
 
-FORMAT: Return a JSON array of objects with "question" and "answer" fields only.
+FORMAT REQUIREMENTS (CRITICAL):
+- Return ONLY a valid JSON array, no other text
+- Do NOT use markdown code blocks or formatting
+- Do NOT include explanatory text outside the JSON
+- Each flashcard must have exactly "question" and "answer" fields
+- Keep answers concise and factual (no parenthetical explanations)
+- Avoid "or" statements in answers - pick the most common option
+
+Example format (return exactly this structure):
+[
+  {
+    "question": "What is photosynthesis?",
+    "answer": "The process by which plants convert light energy into chemical energy"
+  }
+]
 
 ${customInstructions ? `ADDITIONAL INSTRUCTIONS: ${customInstructions}` : ""}
 
@@ -130,6 +144,141 @@ ${text}
 Create the optimal number of high-quality flashcards for comprehensive coverage:`;
 
   return prompt;
+}
+
+function parseOpenAIResponse(rawResponse: string): CreateFlashcard[] {
+  try {
+    console.log('🔍 Parsing OpenAI response, length:', rawResponse.length);
+    
+    // Remove markdown code blocks if present
+    let cleanedResponse = rawResponse.trim();
+    
+    // Remove ```json and ``` if present
+    if (cleanedResponse.startsWith('```json')) {
+      cleanedResponse = cleanedResponse.replace(/^```json\s*/, '');
+      console.log('✅ Removed ```json wrapper');
+    }
+    if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/^```\s*/, '');
+      console.log('✅ Removed ``` wrapper');
+    }
+    if (cleanedResponse.endsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/\s*```$/, '');
+      console.log('✅ Removed closing ``` wrapper');
+    }
+    
+    // Log cleaned response for debugging
+    console.log('🧹 Cleaned response preview:', cleanedResponse.substring(0, 200) + '...');
+    
+    // Try to parse the JSON
+    const parsed = JSON.parse(cleanedResponse);
+    
+    // Validate it's an array or has flashcards/cards field
+    let cards: unknown[] = [];
+    if (Array.isArray(parsed)) {
+      cards = parsed;
+    } else if (parsed.flashcards && Array.isArray(parsed.flashcards)) {
+      cards = parsed.flashcards;
+    } else if (parsed.cards && Array.isArray(parsed.cards)) {
+      cards = parsed.cards;
+    } else {
+      throw new Error('Response is not an array or does not contain cards array');
+    }
+    
+    // Clean up each flashcard
+    const cleanedCards = cards.map((card, index) => {
+      if (!card || typeof card !== 'object' || card === null) {
+        console.warn(`⚠️ Card ${index} is not an object:`, card);
+        return null;
+      }
+      
+      const cardObj = card as Record<string, unknown>;
+      if (!cardObj.question || !cardObj.answer) {
+        console.warn(`⚠️ Card ${index} missing question or answer:`, card);
+        return null;
+      }
+      
+      // Clean up answers that might have problematic content
+      let cleanAnswer = String(cardObj.answer).trim();
+      
+      // Remove parenthetical explanations that break JSON
+      cleanAnswer = cleanAnswer.replace(/\s*\([^)]*\)$/g, '').trim();
+      
+      // Remove extra quotes that might break JSON
+      cleanAnswer = cleanAnswer.replace(/^["']|["']$/g, '');
+      
+      // Remove "or" explanations that break JSON
+      if (cleanAnswer.includes(' or ')) {
+        cleanAnswer = cleanAnswer.split(' or ')[0].trim();
+      }
+      
+      return {
+        question: String(cardObj.question).trim(),
+        answer: cleanAnswer
+      };
+    }).filter(card => card !== null);
+    
+    console.log(`✅ Successfully parsed ${cleanedCards.length} flashcards`);
+    return cleanedCards;
+    
+  } catch (parseError) {
+    console.error('❌ Initial parsing failed:', parseError instanceof Error ? parseError.message : parseError);
+    console.log('🔄 Trying alternative parsing strategies...');
+    
+    return tryAlternativeParsing(rawResponse);
+  }
+}
+
+function tryAlternativeParsing(rawResponse: string): CreateFlashcard[] {
+  try {
+    // Strategy 1: Find JSON array pattern using regex
+    const jsonArrayMatch = rawResponse.match(/\[[\s\S]*\]/);
+    if (jsonArrayMatch) {
+      console.log('🎯 Found JSON array pattern, attempting parse...');
+      
+      let jsonString = jsonArrayMatch[0];
+      
+      // Clean up common issues in the JSON string
+      jsonString = jsonString
+        // Fix the specific problematic case: "answer": "word" (explanation) or "word"
+        .replace(/"answer":\s*"([^"]*?)"\s*\([^)]*\)\s*or\s*"[^"]*?"/g, '"answer": "$1"')
+        // Fix general parenthetical explanations in values
+        .replace(/"([^"]*?)"\s*\([^)]*\)/g, '"$1"')
+        // Remove trailing commas
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix "or" issues in answers
+        .replace(/"([^"]*?)\s+or\s+[^"]*?"/g, '"$1"');
+      
+      const parsed = JSON.parse(jsonString);
+      if (Array.isArray(parsed)) {
+        console.log(`✅ Alternative parsing succeeded with ${parsed.length} cards`);
+        return parsed.map(card => ({
+          question: String(card.question || '').trim(),
+          answer: String(card.answer || '').replace(/\s*\([^)]*\)$/, '').split(' or ')[0].trim()
+        }));
+      }
+    }
+    
+    // Strategy 2: Extract individual cards with regex
+    console.log('🎯 Trying individual card extraction...');
+    const cardPattern = /\{\s*"question"\s*:\s*"([^"]+)"\s*,\s*"answer"\s*:\s*"([^"]+)"\s*\}/g;
+    const matches = [...rawResponse.matchAll(cardPattern)];
+    
+    if (matches.length > 0) {
+      console.log(`✅ Extracted ${matches.length} cards using regex`);
+      return matches.map(match => ({
+        question: match[1].trim(),
+        answer: match[2].replace(/\s*\([^)]*\)$/, '').split(' or ')[0].trim()
+      }));
+    }
+    
+    throw new Error('No valid flashcards found in response');
+    
+  } catch (error) {
+    console.error('❌ All parsing strategies failed:', error instanceof Error ? error.message : error);
+    console.error('❌ Raw response for debugging:', rawResponse.substring(0, 1000));
+    throw new Error(`Failed to parse AI response as JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -192,7 +341,7 @@ export async function POST(request: NextRequest) {
         {
           role: "system",
           content:
-            "You are an expert educational content creator who excels at making high-quality flashcards. Always return valid JSON arrays with question and answer fields. Focus on comprehensive coverage and quality over hitting specific numbers.",
+            "You are an expert educational content creator who excels at making high-quality flashcards. CRITICAL REQUIREMENTS: Always return ONLY a valid JSON array with no markdown formatting, explanatory text, or code blocks. Each flashcard must have exactly 'question' and 'answer' fields. Keep answers concise and factual - avoid parenthetical explanations or 'or' statements. Focus on comprehensive coverage and quality over hitting specific numbers.",
         },
         {
           role: "user",
@@ -223,65 +372,8 @@ export async function POST(request: NextRequest) {
       containsMarkdown: response.includes("```"),
     });
 
-    // Parse and validate the JSON response
-    let flashcards: CreateFlashcard[];
-    try {
-      // Clean the response in case there's markdown formatting
-      const cleanedResponse = response.replace(/```json\n?|\n?```/g, "").trim();
-      console.log("🧹 Cleaned response preview:", {
-        firstChars: cleanedResponse.substring(0, 100) + "...",
-        isCleanedDifferent: cleanedResponse !== response,
-      });
-
-      const parsed = JSON.parse(cleanedResponse);
-      console.log("✅ JSON parsed successfully:", {
-        isArray: Array.isArray(parsed),
-        hasFlashcardsField:
-          parsed && typeof parsed === "object" && "flashcards" in parsed,
-        topLevelKeys:
-          parsed && typeof parsed === "object" ? Object.keys(parsed) : [],
-        arrayLength: Array.isArray(parsed) ? parsed.length : null,
-        flashcardsArrayLength:
-          parsed && Array.isArray(parsed.flashcards)
-            ? parsed.flashcards.length
-            : null,
-      });
-
-      if (Array.isArray(parsed)) {
-        flashcards = parsed;
-      } else if (parsed.flashcards && Array.isArray(parsed.flashcards)) {
-        flashcards = parsed.flashcards;
-      } else {
-        console.error("❌ Response format not recognized:", {
-          parsedType: typeof parsed,
-          parsedKeys:
-            parsed && typeof parsed === "object" ? Object.keys(parsed) : [],
-          parsedStructure: parsed,
-        });
-        throw new Error("Response is not in expected format");
-      }
-    } catch (parseError) {
-      console.error("❌ Failed to parse OpenAI response:", {
-        parseError:
-          parseError instanceof Error ? parseError.message : parseError,
-        rawResponse: response.substring(0, 500) + "...",
-      });
-
-      // Fallback: try to extract JSON from the response
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        try {
-          flashcards = JSON.parse(jsonMatch[0]);
-          console.log("✅ Fallback JSON extraction successful:", {
-            extractedLength: flashcards.length,
-          });
-        } catch {
-          throw new Error("Failed to parse AI response as JSON");
-        }
-      } else {
-        throw new Error("AI response does not contain valid JSON");
-      }
-    }
+    // Parse and validate the JSON response using robust parsing
+    const flashcards = parseOpenAIResponse(response);
 
     console.log("🔍 Validating flashcards:", {
       totalCards: flashcards.length,
@@ -397,13 +489,19 @@ export async function POST(request: NextRequest) {
       if (error.message.includes("API key")) {
         errorMessage = "OpenAI API configuration error";
         statusCode = 500;
-      } else if (error.message.includes("parse")) {
-        errorMessage = "AI response format error - please try again";
+      } else if (error.message.includes("parse") || error.message.includes("JSON")) {
+        errorMessage = "The AI service returned an invalid response. Please try again.";
         statusCode = 502;
       } else if (error.message.includes("No valid flashcards")) {
         errorMessage =
           "Could not generate flashcards from this content. Try providing more detailed text.";
         statusCode = 400;
+      } else if (error.message.includes("timeout") || error.message.includes("network")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+        statusCode = 503;
+      } else if (error.message.includes("rate limit") || error.message.includes("quota")) {
+        errorMessage = "AI service temporarily unavailable. Please try again in a moment.";
+        statusCode = 429;
       } else {
         errorMessage = error.message;
       }
@@ -412,9 +510,51 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: errorMessage,
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : "Unknown error") : undefined,
+        timestamp: new Date().toISOString(),
       },
       { status: statusCode }
     );
   }
+}
+
+// Test function to verify parsing works with problematic responses (development only)
+if (process.env.NODE_ENV === 'development') {
+  function testParsingFunction() {
+    console.log('🧪 Running parsing tests in development mode...');
+    
+    const problematicResponses = [
+      // Original failing response with parenthetical explanations
+      '```json\n[\n    {\n        "question": "What is the Portuguese translation of \'Hello\'?",\n        "answer": "Olá"\n    },\n    {\n        "question": "How do you express \'Thank you\' in Portuguese?",\n        "answer": "Obrigado" (for males) or "Obrigada" (for females)\n    }\n]```',
+      
+      // Response without markdown
+      '[{"question": "Test question?", "answer": "Test answer"}]',
+      
+      // Malformed JSON with trailing comma
+      '[{"question": "Test question?", "answer": "Test answer",}]',
+      
+      // Response with "or" statement
+      '[\n  {\n    "question": "How to say goodbye?",\n    "answer": "Adeus or Tchau"\n  }\n]',
+      
+      // Response nested in object
+      '{"flashcards": [{"question": "What is this?", "answer": "A test"}]}'
+    ];
+    
+    problematicResponses.forEach((response, index) => {
+      try {
+        const result = parseOpenAIResponse(response);
+        console.log(`✅ Test ${index + 1} passed:`, result.length, 'cards parsed');
+        if (result.length > 0) {
+          console.log('   Sample card:', result[0]);
+        }
+      } catch (error) {
+        console.error(`❌ Test ${index + 1} failed:`, error instanceof Error ? error.message : error);
+      }
+    });
+    
+    console.log('🧪 Parsing tests completed');
+  }
+  
+  // Run the test on module load in development
+  testParsingFunction();
 }
