@@ -96,6 +96,12 @@ export const LOADING_STATES = {
   CARD_ADD: "card_add",
   CARD_UPDATE: "card_update",
   CARD_DELETE: "card_delete",
+  // Study Mode
+  STUDY_INIT: "study_init",
+  STUDY_SHUFFLE: "study_shuffle",
+  STUDY_RESET: "study_reset",
+  STUDY_SAVE: "study_save",
+  STUDY_COMPLETE: "study_complete",
 } as const;
 
 export type LoadingStateKey =

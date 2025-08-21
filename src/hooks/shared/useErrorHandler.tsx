@@ -32,7 +32,13 @@ export type ErrorType =
   | "EDIT_UNSAVED_CARD"
   | "EXPORT_NOT_IMPLEMENTED"
   | "UPLOAD_GENERATION_ERROR"
-  | "NO_CARDS_GENERATED";
+  | "NO_CARDS_GENERATED"
+  // Study Mode Error Types
+  | "STUDY_SET_NOT_FOUND"
+  | "STUDY_LOAD_ERROR"
+  | "STUDY_SHUFFLE_ERROR"
+  | "STUDY_RESET_ERROR"
+  | "STUDY_SAVE_ERROR";
 
 interface ErrorHandlerState {
   type: ErrorType | null;

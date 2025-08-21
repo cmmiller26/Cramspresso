@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { FlashcardSet, StudyRound, StudySession } from "@/lib/types/flashcards";
+import { StudyRound, StudySession, Flashcard } from "@/lib/types/flashcards";
+import { useLoadingState, LOADING_STATES } from "@/hooks/shared/useLoadingState";
+import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { useStudyKeyboard } from "./useStudyKeyboard";
+import * as setsApi from "@/lib/api/sets";
+
+// Use SetData from API types instead of FlashcardSet to match API response
+type SetData = {
+  id: string;
+  name: string;
+  cards: Flashcard[];
+  createdAt: string;
+  updatedAt: string;
+};
 
 interface StudyActions {
   onShowAnswer: () => void;
@@ -14,12 +26,13 @@ interface StudyActions {
   onStartMissedCardsRound: () => void; // ✅ ADD: For all missed cards across session
   onToggleKeyboardHelp: () => void;
   onClearControlsError: () => void;
+  saveStudySession: () => Promise<void>; // ✅ ADD: Study session persistence
   loadSet: () => Promise<void>;
 }
 
 interface StudyState {
   // Data state
-  setData: FlashcardSet | null;
+  setData: SetData | null;
   studySession: StudySession | null;
   currentRound: StudyRound | null;
 
@@ -40,6 +53,8 @@ interface StudyState {
     reset: boolean;
   };
   controlsError: string | null;
+  hasError: boolean;
+  clearError: () => void;
 
   // Actions
   actions: StudyActions;
@@ -49,7 +64,7 @@ export function useStudyState(setId: string): StudyState {
   const { isSignedIn } = useAuth();
 
   // Core study state
-  const [setData, setSetData] = useState<FlashcardSet | null>(null);
+  const [setData, setSetData] = useState<SetData | null>(null);
   const [studySession, setStudySession] = useState<StudySession | null>(null);
   const [currentRound, setCurrentRound] = useState<StudyRound | null>(null);
 
@@ -64,31 +79,34 @@ export function useStudyState(setId: string): StudyState {
   const [shuffled, setShuffled] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
-  // Loading and error state
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [controlsLoading, setControlsLoading] = useState({
-    shuffle: false,
-    reset: false,
-  });
-  const [controlsError, setControlsError] = useState<string | null>(null);
+  // Shared infrastructure for loading states
+  const { setLoading, isLoading } = useLoadingState([
+    LOADING_STATES.STUDY_INIT,
+    LOADING_STATES.STUDY_SHUFFLE,
+    LOADING_STATES.STUDY_RESET,
+  ]);
 
-  // Load set data
+  // Shared infrastructure for error handling
+  const { error: errorState, showError, clearError, hasError } = useErrorHandler();
+
+  // Legacy compatibility - map shared infrastructure to existing interface
+  const loading = isLoading(LOADING_STATES.STUDY_INIT);
+  const controlsLoading = {
+    shuffle: isLoading(LOADING_STATES.STUDY_SHUFFLE),
+    reset: isLoading(LOADING_STATES.STUDY_RESET),
+  };
+  const error: string | null = hasError ? errorState.message : null;
+  const controlsError: string | null = hasError ? errorState.message : null;
+
+  // Load set data with shared infrastructure
   const loadSet = useCallback(async () => {
     if (!isSignedIn) return;
 
-    setLoading(true);
-    setError(null);
+    setLoading(LOADING_STATES.STUDY_INIT, true);
+    clearError();
     try {
-      const res = await fetch(`/api/sets/${setId}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error("Set not found");
-        }
-        throw new Error("Failed to load set");
-      }
-
-      const data = await res.json();
+      // Use centralized API client
+      const data = await setsApi.getSetById(setId);
       setSetData(data);
 
       // Initialize study session with all required fields
@@ -124,11 +142,20 @@ export function useStudyState(setId: string): StudyState {
       setCurrentRound(initialRound);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const errorMessage = err instanceof Error ? err.message : "Failed to load study session";
+      
+      if (errorMessage.includes("not found") || errorMessage.includes("404")) {
+        showError(
+          "STUDY_SET_NOT_FOUND",
+          "This flashcard set was not found. It may have been deleted or you may not have permission to access it."
+        );
+      } else {
+        showError("STUDY_LOAD_ERROR", errorMessage);
+      }
     } finally {
-      setLoading(false);
+      setLoading(LOADING_STATES.STUDY_INIT, false);
     }
-  }, [setId, isSignedIn]);
+  }, [setId, isSignedIn, setLoading, showError, clearError]);
 
   // Action handlers
   const handleShowAnswer = useCallback(() => {
@@ -355,8 +382,8 @@ export function useStudyState(setId: string): StudyState {
   const handleShuffleRound = useCallback(async () => {
     if (!currentRound) return;
 
-    setControlsLoading((prev) => ({ ...prev, shuffle: true }));
-    setControlsError(null);
+    setLoading(LOADING_STATES.STUDY_SHUFFLE, true);
+    clearError();
 
     try {
       // Create shuffled copy of current round's cards
@@ -394,17 +421,20 @@ export function useStudyState(setId: string): StudyState {
       setIsTransitioning(false);
     } catch (error) {
       console.error("Error shuffling cards:", error);
-      setControlsError("Failed to shuffle cards. Please try again.");
+      showError(
+        "STUDY_SHUFFLE_ERROR",
+        error instanceof Error ? error.message : "Failed to shuffle cards. Please try again."
+      );
     } finally {
-      setControlsLoading((prev) => ({ ...prev, shuffle: false }));
+      setLoading(LOADING_STATES.STUDY_SHUFFLE, false);
     }
-  }, [currentRound]);
+  }, [currentRound, setLoading, clearError, showError]);
 
   const handleResetToOriginal = useCallback(async () => {
     if (!studySession || !currentRound) return;
 
-    setControlsLoading((prev) => ({ ...prev, reset: true }));
-    setControlsError(null);
+    setLoading(LOADING_STATES.STUDY_RESET, true);
+    clearError();
 
     try {
       // Get original card order from the set data
@@ -440,11 +470,14 @@ export function useStudyState(setId: string): StudyState {
       setIsTransitioning(false);
     } catch (error) {
       console.error("Error resetting cards:", error);
-      setControlsError("Failed to reset cards. Please try again.");
+      showError(
+        "STUDY_RESET_ERROR",
+        error instanceof Error ? error.message : "Failed to reset cards. Please try again."
+      );
     } finally {
-      setControlsLoading((prev) => ({ ...prev, reset: false }));
+      setLoading(LOADING_STATES.STUDY_RESET, false);
     }
-  }, [studySession, currentRound, setData]);
+  }, [studySession, currentRound, setData, setLoading, clearError, showError]);
 
   const handleStartReviewRound = useCallback(
     (updatedSession: StudySession, reviewRound: StudyRound) => {
@@ -506,8 +539,53 @@ export function useStudyState(setId: string): StudyState {
   }, []);
 
   const handleClearControlsError = useCallback(() => {
-    setControlsError(null);
-  }, []);
+    clearError();
+  }, [clearError]);
+
+  // Study session persistence with shared infrastructure
+  const saveStudySession = useCallback(async () => {
+    if (!studySession || !currentRound) return;
+
+    setLoading(LOADING_STATES.STUDY_SAVE, true);
+    try {
+      // Calculate session metrics for future analytics
+      const sessionMetrics = {
+        setId: studySession.setId,
+        userId: isSignedIn ? 'current-user' : 'anonymous', // Would use actual user ID in real implementation
+        sessionDuration: Date.now() - studySession.startTime.getTime(),
+        totalCards: studySession.originalSetSize,
+        cardsStudied: studySession.totalCardsStudied,
+        correctAnswers: studySession.totalCorrectAnswers,
+        incorrectAnswers: studySession.totalIncorrectAnswers,
+        skippedCards: studySession.totalSkippedCards,
+        accuracyRate: studySession.totalCardsStudied > 0 
+          ? studySession.totalCorrectAnswers / studySession.totalCardsStudied 
+          : 0,
+        completedRounds: studySession.rounds.length,
+        currentRoundIndex: studySession.currentRoundIndex,
+        deviceType: typeof window !== 'undefined' && window.innerWidth < 768 ? 'mobile' : 'desktop'
+      };
+
+      // Foundation for future analytics - currently just log the metrics
+      console.log('Study session metrics collected:', sessionMetrics);
+      
+      // TODO: In future phases, send to analytics API
+      // await fetch('/api/analytics/study-session', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(sessionMetrics)
+      // });
+
+    } catch (error) {
+      console.error('Error saving study session:', error);
+      showError(
+        'STUDY_SAVE_ERROR',
+        error instanceof Error ? error.message : 'Failed to save study progress'
+      );
+    } finally {
+      setLoading(LOADING_STATES.STUDY_SAVE, false);
+    }
+  }, [studySession, currentRound, isSignedIn, setLoading, showError]);
 
   // ✅ ADD: Handler for starting a missed cards round (all missed cards from session)
   const handleStartMissedCardsRound = useCallback(() => {
@@ -577,6 +655,7 @@ export function useStudyState(setId: string): StudyState {
     onStartMissedCardsRound: handleStartMissedCardsRound, // ✅ ADD
     onToggleKeyboardHelp: handleToggleKeyboardHelp,
     onClearControlsError: handleClearControlsError,
+    saveStudySession, // ✅ ADD: Study session persistence
     loadSet,
   };
 
@@ -600,6 +679,8 @@ export function useStudyState(setId: string): StudyState {
     error,
     controlsLoading,
     controlsError,
+    hasError,
+    clearError,
 
     // Actions
     actions,
