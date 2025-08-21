@@ -84,10 +84,6 @@ export default function SetDetailView() {
     loadSet();
   }, [loadSet]);
 
-  const handleDelete = async () => {
-    await setsApi.deleteSet(setId);
-    // Navigation handled by SetActions component
-  };
 
   // Show loading state while checking auth
   if (!isLoaded || !isSignedIn) {
@@ -139,7 +135,6 @@ export default function SetDetailView() {
             setId={setId}
             setName={setData.name}
             cardCount={setData.cards.length}
-            onDelete={handleDelete}
             loading={isLoading(LOADING_STATES.SET_LOAD)}
           />
         )}

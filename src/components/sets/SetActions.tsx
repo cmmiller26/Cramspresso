@@ -6,6 +6,7 @@ import { useLoadingState, LOADING_STATES } from "@/hooks/shared/useLoadingState"
 import { useErrorHandler } from "@/hooks/shared/useErrorHandler";
 import { useRouter } from "next/navigation";
 import { BookOpen, Edit, Trash2, Download } from "lucide-react";
+import * as setsApi from "@/lib/api/sets";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,6 @@ interface Props {
   setId: string;
   setName: string;
   cardCount: number;
-  onDelete: () => Promise<void>;
   loading?: boolean;
 }
 
@@ -30,7 +30,6 @@ export const SetActions = memo(function SetActions({
   setId,
   setName,
   cardCount,
-  onDelete,
   loading = false,
 }: Props) {
   const router = useRouter();
@@ -42,13 +41,22 @@ export const SetActions = memo(function SetActions({
   const { showError, clearError, renderError, hasError } = useErrorHandler();
 
   const handleDelete = async () => {
+    console.log("🗑️ Starting delete operation for set:", setId);
     setLoading(LOADING_STATES.SET_DELETE, true);
     try {
       clearError();
-      await onDelete();
+      console.log("🗑️ Calling deleteSet API...");
+      await setsApi.deleteSet(setId);
+      console.log("✅ Delete successful, navigating to dashboard...");
       router.push("/dashboard");
     } catch (error) {
-      console.error("Error deleting set:", error);
+      console.error("❌ Error deleting set:", error);
+      console.error("❌ Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        type: typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
       showError(
         "SET_DELETE_ERROR",
         error instanceof Error ? error.message : "Failed to delete set. Please try again.",
@@ -58,6 +66,7 @@ export const SetActions = memo(function SetActions({
         }
       );
     } finally {
+      console.log("🗑️ Delete operation completed, clearing loading state...");
       setLoading(LOADING_STATES.SET_DELETE, false);
     }
   };
@@ -134,7 +143,11 @@ export const SetActions = memo(function SetActions({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDelete}
+                onClick={() => {
+                  handleDelete().catch((error) => {
+                    console.error("Unhandled delete error:", error);
+                  });
+                }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {isLoading(LOADING_STATES.SET_DELETE) ? "Deleting..." : "Delete Set"}
